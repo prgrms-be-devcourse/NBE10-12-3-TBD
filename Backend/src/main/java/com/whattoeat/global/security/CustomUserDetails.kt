@@ -10,7 +10,7 @@ import java.util.List
 
 @Getter
 @RequiredArgsConstructor
-class CustomUserDetails(private val user: User) : UserDetails {
+class CustomUserDetails(val user: User) : UserDetails {
 
     override fun getAuthorities(): Collection<GrantedAuthority> =
         listOf(SimpleGrantedAuthority("ROLE_${user.role.name}"))
