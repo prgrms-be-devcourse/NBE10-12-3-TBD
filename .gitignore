@@ -82,3 +82,8 @@ Backend/build/
 ### Kotlin migration baseline (local only) ###
 /Backend/docs/migration/
 /Backend/scripts/migration-baseline.sh
+
+### Large media files ###
+*.mov
+*.mp4
+*.avi

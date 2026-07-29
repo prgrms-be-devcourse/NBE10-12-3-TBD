@@ -30,7 +30,7 @@ class GlobalExceptionHandlerKakaoTest {
         ResponseEntity<ErrorResponse> response = handler.handleKakaoApiException(exception);
 
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().message()).isEqualTo("카카오 API 요청 오류 :401 UNAUTHORIZED");
-        assertThat(response.getBody().status()).isEqualTo(502);
+        assertThat(response.getBody().getMessage()).isEqualTo("카카오 API 요청 오류 :401 UNAUTHORIZED");
+        assertThat(response.getBody().getStatus()).isEqualTo(502);
     }
 }
