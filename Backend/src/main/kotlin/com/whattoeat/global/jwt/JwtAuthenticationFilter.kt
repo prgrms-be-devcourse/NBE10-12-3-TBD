@@ -34,7 +34,7 @@ class JwtAuthenticationFilter(
 
             if ("access" == tokenType) {
                 val userId = jwtUtil.getUserId(token)
-                if (redisTemplate.hasKey("blacklist:$token") != true) {
+                if (redisTemplate.hasKey("blacklist:$token") == false) {
                     val userDetails = userDetailsService.loadUserByUsername(userId.toString())
                     val authenticationToken = UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.authorities,
