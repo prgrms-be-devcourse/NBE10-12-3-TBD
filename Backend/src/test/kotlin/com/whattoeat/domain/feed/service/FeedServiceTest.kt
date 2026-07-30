@@ -157,7 +157,7 @@ class FeedServiceTest {
         val pageable = PageRequest.of(0, 10)
         given(feedRepository.findAllByOrderByIdDesc(pageable))
             .willReturn(PageImpl(listOf(feed1, feed2), pageable, 2))
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(listOf(1L, 2L))).willReturn(emptyList())
 
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(any(), any()))
             .willReturn(listOf(feed1.id))
@@ -292,7 +292,7 @@ class FeedServiceTest {
         given(feedRepository.findByUser_IdInOrderByIdDesc(listOf(2L), pageable))
             .willReturn(PageImpl(listOf(user2Feed), pageable, 1))
 
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(listOf(10L))).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(any(), any()))
             .willReturn(emptyList())
 
@@ -331,7 +331,7 @@ class FeedServiceTest {
         given(feedRepository.findByUser_IdNotInOrderByIdDesc(listOf(2L), pageable))
             .willReturn(PageImpl(listOf(user1Feed, user3Feed), pageable, 2))
 
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(listOf(10L, 30L))).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(any(), any()))
             .willReturn(emptyList())
 
