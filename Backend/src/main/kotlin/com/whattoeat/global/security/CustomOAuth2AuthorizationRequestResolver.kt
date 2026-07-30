@@ -16,7 +16,7 @@ import java.util.*
 class CustomOAuth2AuthorizationRequestResolver(
     private val clientRegistrationRepository: ClientRegistrationRepository
 ) : OAuth2AuthorizationRequestResolver {
-    private val log = LoggerFactory.getLogger(CustomOAuth2LoginSuccessHandler::class.java)
+    private val log = LoggerFactory.getLogger(CustomOAuth2AuthorizationRequestResolver::class.java)
 
 
     private fun defaultResolver(): DefaultOAuth2AuthorizationRequestResolver {
