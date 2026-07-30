@@ -1,8 +1,6 @@
 package com.whattoeat.global.security
 
 import com.whattoeat.domain.user.service.UserService
-import lombok.RequiredArgsConstructor
-import lombok.extern.slf4j.Slf4j
 import org.slf4j.LoggerFactory
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest
@@ -12,9 +10,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.*
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 class CustomOAuth2UserService(private val userService: UserService) : DefaultOAuth2UserService() {
     private val log = LoggerFactory.getLogger(CustomOAuth2UserService::class.java)
 
