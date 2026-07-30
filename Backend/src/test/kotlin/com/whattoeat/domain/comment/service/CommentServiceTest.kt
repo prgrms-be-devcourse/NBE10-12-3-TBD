@@ -147,7 +147,8 @@ internal class CommentServiceTest {
         given(commentRepository.findById(1L)).willReturn(Optional.of(comment))
 
         assertThatThrownBy { commentService.deleteComment(999L, 1L, 1L) }
-            .isInstanceOf(IllegalArgumentException::class.java)
+            .isInstanceOf(CommentNotFoundException::class.java)
+            .hasMessageContaining("1")
         then(commentRepository).should(never()).delete(comment)
     }
 }
