@@ -76,6 +76,10 @@ internal class AuthServiceTest {
 
         given(userRepository
             .save(ArgumentMatchers.any(User::class.java))).willReturn(user)
+
+        val result = authService.signup(signUpRequest)
+        assertThat(result).isSameAs(user)
+
         Mockito.verify(userRepository, Mockito.times(1))
             .save(ArgumentMatchers.any(User::class.java))
     }
