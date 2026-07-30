@@ -18,11 +18,11 @@ data class AuthUserResponse(
     companion object {
         fun from(user: User): AuthUserResponse = AuthUserResponse(
             user.id,
-            user.getNickname(),
-            user.getProfileImage(),
-            user.getEmail(),
-            user.getProvider(),
-            user.getRole(),
+            user.nickname,
+            user.profileImage,
+            user.email,
+            user.provider,
+            user.role,
             user.createdAt
         )
     }
