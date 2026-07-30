@@ -10,32 +10,49 @@ import jakarta.persistence.Table
 @Entity
 @Table(name = "users")
 class User(
+    loginId: String? = null,
+    password: String? = null,
+    kakaoId: String? = null,
+    nickname: String,
+    profileImage: String? = null,
+    email: String,
+    role: Role = Role.USER,
+    provider: Provider
+) : BaseEntity() {
+
     @Column(name = "login_id", length = 50, unique = true)
-    var loginId: String? = null,
+    var loginId: String? = loginId
+        protected set
 
     @Column(length = 255)
-    var password: String? = null,
+    var password: String? = password
+        protected set
 
     @Column(name = "kakao_id", length = 255, unique = true)
-    var kakaoId: String? = null,
+    var kakaoId: String? = kakaoId
+        protected set
 
     @Column(length = 100, nullable = false)
-    var nickname: String? = null,
+    var nickname: String = nickname
+        protected set
 
     @Column(name = "profile_image", length = 500)
-    var profileImage: String? = null,
+    var profileImage: String? = profileImage
+        protected set
 
     @Column(length = 100, nullable = false)
-    var email: String? = null,
+    var email: String = email
+        protected set
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
-    var role: Role = Role.USER,
+    var role: Role = role
+        protected set
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
-    var provider: Provider? = null
-) : BaseEntity() {
+    var provider: Provider = provider
+        protected set
 
     fun updateProfile(nickname: String?, profileImage: String?) {
         if (nickname != null) this.nickname = nickname
@@ -83,11 +100,11 @@ class User(
             loginId = loginId,
             password = password,
             kakaoId = kakaoId,
-            nickname = nickname,
+            nickname = requireNotNull(nickname) { "nickname must be set" },
             profileImage = profileImage,
-            email = email,
+            email = requireNotNull(email) { "email must be set" },
             role = role ?: Role.USER,
-            provider = provider
+            provider = requireNotNull(provider) { "provider must be set" }
         )
     }
 }

@@ -106,7 +106,7 @@ public class FeedServiceTest {
     @Test
     @DisplayName("피드 생성 성공")
     public void createFeed_success() throws IOException {
-        User user = User.builder().nickname("test").build();
+        User user = User.builder().nickname("test").email("test@test.com").provider(Provider.LOCAL).build();
         FeedCreateRequest feedCreateRequest = new FeedCreateRequest("맛집이네요", null);
         MultipartFile image = null;
 
@@ -125,7 +125,7 @@ public class FeedServiceTest {
     @Test
     @DisplayName("피드 생성 시 FeedCreatedEvent가 발행된다")
     public void createFeed_publishesFeedCreatedEvent() throws IOException {
-        User user = User.builder().nickname("test").build();
+        User user = User.builder().nickname("test").email("test@test.com").provider(Provider.LOCAL).build();
         ReflectionTestUtils.setField(user, "id", 1L);
         FeedCreateRequest feedCreateRequest = new FeedCreateRequest("맛집이네요", null);
         MultipartFile image = null;
