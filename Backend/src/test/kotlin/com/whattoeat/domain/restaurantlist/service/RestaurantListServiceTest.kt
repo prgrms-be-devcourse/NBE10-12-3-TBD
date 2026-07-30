@@ -7,6 +7,7 @@ import com.whattoeat.domain.restaurantlist.entity.RestaurantList
 import com.whattoeat.domain.restaurantlist.entity.RestaurantListItem
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListItemRepository
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListRepository
+import com.whattoeat.domain.restaurantlist.repository.SavedRestaurantListRepository
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.ListNotFoundException
@@ -53,6 +54,9 @@ class RestaurantListServiceTest {
 
     @InjectMocks
     lateinit var restaurantListService: RestaurantListService
+
+    @Mock
+    lateinit var savedRestaurantListRepository: SavedRestaurantListRepository
 
     private fun mockUser(
         id: Long,
@@ -723,5 +727,38 @@ class RestaurantListServiceTest {
                 description,
                 moodTag
             )
+    }
+
+    @Test
+    fun `맛집리스트 삭제성공`() {
+        val listId = 1L
+        val userId = 1L
+        val user = mockUser(userId,"user1")
+        val restaurantList = createRestaurantList(listId, user)
+
+        given(restaurantListRepository.findByIdAndUserId(listId,userId))
+            .willReturn(Optional.of(restaurantList))
+        given(savedRestaurantListRepository.deleteAllByRestaurantListId(listId)).willReturn(2L)
+
+        restaurantListService.delete(listId, userId)
+
+        then(savedRestaurantListRepository).should().deleteAllByRestaurantListId(listId)
+        then(restaurantListRepository).should().delete(restaurantList)
+    }
+
+    @Test
+    fun `맛집리스트가 없거나 본인 소유가 아니면 삭제 실패`(){
+        val listId = 1L
+        val userId = 1L
+
+        given(restaurantListRepository.findByIdAndUserId(listId, userId))
+            .willReturn(Optional.empty())
+        assertThatThrownBy {restaurantListService.delete(listId, userId)}
+            .isInstanceOf(ListNotFoundException::class.java).hasMessage("리스트를 찾을 수 없습니다: 1")
+
+        then(savedRestaurantListRepository).shouldHaveNoInteractions()
+        then(restaurantListRepository).should(never())
+            .delete(any(RestaurantList::class.java))
+
     }
 }

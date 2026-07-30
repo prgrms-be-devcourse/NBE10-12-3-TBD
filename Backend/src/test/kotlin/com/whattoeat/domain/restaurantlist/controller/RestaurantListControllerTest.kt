@@ -42,6 +42,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDateTime
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 
 @WebMvcTest(
     controllers = [RestaurantListController::class],
@@ -639,6 +640,21 @@ class RestaurantListControllerTest {
                 MoodTag.DATE
             )
     }
+
+    @Test
+    fun `맛집리스트 삭제 성공`() {
+        val listId = 1L
+        mockMvc.perform(delete("/api/v1/lists/{id}", listId))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data").doesNotExist())
+            .andExpect(
+                jsonPath("$.message").value("맛집 리스트가 삭제되었습니다.")
+            )
+
+        then(restaurantListService).should().delete(listId,TEST_USER_ID)
+    }
+
 
     companion object {
         private const val TEST_USER_ID = 1L
