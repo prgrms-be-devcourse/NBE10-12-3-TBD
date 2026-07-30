@@ -51,7 +51,7 @@ class CustomOAuth2LoginSuccessHandler(
         // 여기서 쿠키를 바로 굽지 않는다: 이 응답은 프론트가 아니라 백엔드 자신의 도메인으로의
         // 직접 리다이렉트라서, 쿠키를 지금 세팅하면 백엔드 도메인에만 스코프된다.
         // 프론트가 /api 프록시로 이 코드를 교환할 때 쿠키를 세팅해야 프론트 도메인에 쿠키가 붙는다.
-        val code = authService.createOAuthCode(user.id)
+        val code = authService.createOAuthCode(checkNotNull(user.id){"인증 사용자 id가 없습니다."})
 
         val redirectUri = resolveRedirectUri(request.getParameter("state"))
         val encodedCode = URLEncoder.encode(code, StandardCharsets.UTF_8)
