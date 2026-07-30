@@ -204,9 +204,7 @@ internal class CommentControllerTest {
     fun deleteComment_다른_피드의_댓글이면_404() {
         willThrow(CommentNotFoundException(1L))
             .given(commentService).deleteComment(999L,1L,1L)
-        mockMvc.perform(
-            MockMvcRequestBuilders.delete("/api/v1/feeds/999/comments/1")
-        )
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/v1/feeds/999/comments/1"))
         .andExpect(MockMvcResultMatchers.status().isNotFound())
         then(commentService).should().deleteComment(999L, 1L, 1L)
     }
