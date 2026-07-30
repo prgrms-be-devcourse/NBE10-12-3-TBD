@@ -134,6 +134,16 @@ class RestaurantListController (
         )
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "맛집 리스트 삭제")
+    fun deleteRestaurantList(
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        @PathVariable id: Long,
+    ): RsData<Void>{
+        restaurantListService.delete(id, userDetails.userId)
+        return RsData.success(null, "맛집 리스트가 삭제되었습니다.")
+    }
+
 
     @PutMapping("/{id}/items/{itemId}")
     @Operation(summary = "식당 리스트 아이템 수정(순서/메모)")

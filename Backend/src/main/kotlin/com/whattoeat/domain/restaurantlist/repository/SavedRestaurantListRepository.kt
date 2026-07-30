@@ -18,4 +18,5 @@ interface SavedRestaurantListRepository : JpaRepository<SavedRestaurantList, Lon
             "restaurantList.user"
     ])
     fun findByUserId(userId: Long, pageable: Pageable): Page<SavedRestaurantList>
+    fun deleteAllByRestaurantListId(restaurantListId: Long): Long
 }
