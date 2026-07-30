@@ -174,10 +174,14 @@ class RestaurantListService(
             restaurantListItemRepository.save(copyListItem)
         }
         restaurantListItemRepository.flush()
+
+        val copyListId = copyList.id
+            ?: throw IllegalStateException("복사된 맛집 리스트의 ID가 생성되지 않았습니다.")
+
         entityManager.clear()
 
-        return restaurantListRepository.findByIdWithItems(copyList.id)
-                .orElseThrow { ListNotFoundException(copyList.id) }
+        return restaurantListRepository.findByIdWithItems(copyListId)
+            .orElseThrow { ListNotFoundException(copyListId) }
     }
 
     fun update(
