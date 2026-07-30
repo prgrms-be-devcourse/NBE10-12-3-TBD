@@ -24,7 +24,7 @@ class RestaurantListService(
     private val restaurantRepository: RestaurantRepository,
     private val entityManager: EntityManager
 ) {
-    fun create(userId: Long, title: String, description: String, moodTag: MoodTag): RestaurantList {
+    fun create(userId: Long, title: String, description: String, moodTag: MoodTag?): RestaurantList {
         val user = userRepository.findById(userId)
                 .orElseThrow { UserNotFoundException(userId) }
 
@@ -189,7 +189,7 @@ class RestaurantListService(
         userId: Long,
         title: String,
         description: String,
-        moodTag: MoodTag,
+        moodTag: MoodTag?,
     ) : RestaurantList{
         val restaurantList = restaurantListRepository.findById(listId)
                 .orElseThrow { ListNotFoundException(listId) }

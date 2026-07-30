@@ -6,14 +6,14 @@ import com.whattoeat.domain.restaurantlist.entity.SavedRestaurantList
 import java.time.LocalDateTime
 
 data class SavedRestaurantListResponse(
-        val listId: Long?,
-        val userId: Long?,
-        val nickname: String,
-        val title: String,
-        val description: String,
-        val moodTag: MoodTag,
-        val items: List<RestaurantListResponse.RestaurantListItemDetail>,
-        val savedAt: LocalDateTime?
+    val listId: Long?,
+    val userId: Long?,
+    val nickname: String,
+    val title: String,
+    val description: String,
+    val moodTag: MoodTag?,
+    val items: List<RestaurantListResponse.RestaurantListItemDetail>,
+    val savedAt: LocalDateTime?
 ) {
     companion object {
         @JvmStatic

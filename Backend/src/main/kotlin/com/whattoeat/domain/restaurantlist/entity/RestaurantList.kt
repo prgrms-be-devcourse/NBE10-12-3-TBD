@@ -35,7 +35,7 @@ class RestaurantList protected constructor() : BaseEntity() {
     // 분위기 태그
     @Enumerated(EnumType.STRING)
     @Column(name = "mood_tag", length = 50)
-    lateinit var moodTag: MoodTag
+    var moodTag: MoodTag? = null
         protected set
 
     // 수정일
@@ -53,7 +53,7 @@ class RestaurantList protected constructor() : BaseEntity() {
         user: User,
         title: String,
         description: String,
-        moodTag: MoodTag
+        moodTag: MoodTag?
     ) : this() {
         this.user = user
         this.title = title
@@ -64,7 +64,7 @@ class RestaurantList protected constructor() : BaseEntity() {
     fun update(
         title: String,
         description: String,
-        moodTag: MoodTag
+        moodTag: MoodTag?
     ) {
         this.title = title;
         this.description = description

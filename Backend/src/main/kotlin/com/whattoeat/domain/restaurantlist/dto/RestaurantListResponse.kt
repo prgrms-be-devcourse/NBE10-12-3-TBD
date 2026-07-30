@@ -22,7 +22,7 @@ class RestaurantListResponse {
         val nickname: String,
         val title: String,
         val description: String,
-        val moodTag: MoodTag,
+        val moodTag: MoodTag?,
         val itemCount: Int,
         val createdAt: LocalDateTime?,
     ) {
@@ -40,14 +40,14 @@ class RestaurantListResponse {
 
     // 단건조회용
     data class RestaurantListDetail(
-            val listId: Long?,
-            val userId: Long?,
-            val nickname: String,
-            val title: String,
-            val description: String,
-            val moodTag: MoodTag,
-            val items: List<RestaurantListItemDetail>,
-            val createdAt: LocalDateTime?,
+        val listId: Long?,
+        val userId: Long?,
+        val nickname: String,
+        val title: String,
+        val description: String,
+        val moodTag: MoodTag?,
+        val items: List<RestaurantListItemDetail>,
+        val createdAt: LocalDateTime?,
     ) {
         constructor(restaurantList: RestaurantList) : this(
             restaurantList.id,

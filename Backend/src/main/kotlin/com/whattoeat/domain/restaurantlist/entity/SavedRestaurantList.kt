@@ -19,11 +19,13 @@ class SavedRestaurantList protected constructor() : BaseEntity() {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     lateinit var user: User
+        protected set
 
     // 저장된 원본 리스트
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_list_id", nullable = false)
     lateinit var restaurantList: RestaurantList
+        protected set
 
     constructor(
         user: User,
