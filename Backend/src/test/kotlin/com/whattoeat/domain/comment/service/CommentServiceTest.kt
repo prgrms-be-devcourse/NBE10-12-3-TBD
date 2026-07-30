@@ -45,9 +45,8 @@ internal class CommentServiceTest {
     )
 
 
-    private fun createFeed(user: User): Feed = Feed(
-        user = user, content = "피드 내용"
-    )
+    private fun createFeed(user: User): Feed = Feed.builder().user(user).content("피드 내용").build()
+
 
     @Test
     fun getComments_성공() {

@@ -32,10 +32,10 @@ internal class CommentRepositoryTest {
     }
 
     private fun createAndSaveFeed(user: User, content: String): Feed {
-        val feed = Feed(
-            user = user,
-            content = content,
-        )
+        val feed = Feed.builder()
+            .user(user)
+            .content(content).build()
+
         return entityManager.persistAndFlush(feed)
     }
 
