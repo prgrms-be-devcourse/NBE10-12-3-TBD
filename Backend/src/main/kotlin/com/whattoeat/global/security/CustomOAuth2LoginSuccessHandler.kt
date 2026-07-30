@@ -19,7 +19,7 @@ import java.util.*
 @Component
 class CustomOAuth2LoginSuccessHandler(
     private val authService: AuthService,
-    //application.yaml 파일에 app: fonrtend: url: 없으면 localhost:3000 동작
+    //application.yaml 파일에 app: frontend: url: 없으면 localhost:3000 동작
     @param:Value("\${app.frontend.url:http://localhost:3000}")
     private val frontendUrl: String
 ) : AuthenticationSuccessHandler {
