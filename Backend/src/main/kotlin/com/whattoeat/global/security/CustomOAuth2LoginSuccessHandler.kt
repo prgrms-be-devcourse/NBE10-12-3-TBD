@@ -11,6 +11,8 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.stereotype.Component
 import org.springframework.web.util.UriUtils
 import java.io.IOException
+import java.net.URI
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.*
 
@@ -18,11 +20,22 @@ import java.util.*
 class CustomOAuth2LoginSuccessHandler(
     private val authService: AuthService,
     //application.yaml 파일에 app: fonrtend: url: 없으면 localhost:3000 동작
-    @Value("\${app.frontend.url:http://localhost:3000}")
+    @param:Value("\${app.frontend.url:http://localhost:3000}")
     private val frontendUrl: String
 ) : AuthenticationSuccessHandler {
 
     private val log = LoggerFactory.getLogger(CustomOAuth2LoginSuccessHandler::class.java)
+
+    private val allowedFrontendUri = URI.create(frontendUrl).also { uri ->
+        val isHTTP = uri.scheme?.equals("http", ignoreCase = true) == true
+        val isHTTPS = uri.scheme?.equals("https", ignoreCase = true) == true
+
+        require(
+            (isHTTP || isHTTPS) &&
+                    !uri.host.isNullOrBlank() &&
+                    uri.userInfo == null
+        ) { "app.frontend.url은 유효한 HTTP(S) URL 이어야 합니다." }
+    }
 
     @Throws(IOException::class, ServletException::class)
     override fun onAuthenticationSuccess(
@@ -40,20 +53,48 @@ class CustomOAuth2LoginSuccessHandler(
         // 프론트가 /api 프록시로 이 코드를 교환할 때 쿠키를 세팅해야 프론트 도메인에 쿠키가 붙는다.
         val code = authService.createOAuthCode(user.id)
 
-        var redirectUri = frontendUrl
-        val stateParam = request.getParameter("state")
-        log.info("[OAuth2] stateParam={}", stateParam)
+        val redirectUri = resolveRedirectUri(request.getParameter("state"))
+        val encodedCode = URLEncoder.encode(code, StandardCharsets.UTF_8)
+        val target = "${redirectUri.trimEnd('/')}/oauth/callback?code=$encodedCode"
+        log.info("[OAuth2] redirecting to trusted frontend callback")
 
-        if (stateParam != null && !stateParam.isBlank()) {
-            // Base64 URL-safe 디코딩
-            val decodeState = String(
+        response.sendRedirect(target)
+    }
+
+    private fun resolveRedirectUri(stateParam: String?): String {
+        if (stateParam.isNullOrBlank()) return frontendUrl
+        return try {
+            val decodedState = String(
                 Base64.getUrlDecoder().decode(stateParam),
-                StandardCharsets.UTF_8
+                StandardCharsets.UTF_8,
             )
-            redirectUri = decodeState.split("#".toRegex(), limit = 2).toTypedArray()[0]
+            val candidateValue = decodedState.substringBefore('#')
+            val candidateUri = URI.create(candidateValue)
+
+            if (isAllowedRedirectUri(candidateUri)) {
+                candidateUri.toString()
+            } else {
+                log.warn("[OAuth2] blocked redirect outside allowed frontend origin")
+                frontendUrl
+            }
+        } catch (_: IllegalArgumentException) {
+            log.warn("[Oauth2] invalid OAuth2 state; falling back to frontendUrl")
+            frontendUrl
         }
-        redirectUri = redirectUri + "/oauth/callback?code=" + UriUtils.encode(code, StandardCharsets.UTF_8)
-        log.info("[OAuth2] redirecting to {}", redirectUri)
-        response.sendRedirect(redirectUri)
+    }
+
+    private fun isAllowedRedirectUri(candidate: URI): Boolean =
+        candidate.isAbsolute &&
+                candidate.userInfo == null &&
+                candidate.scheme?.equals(allowedFrontendUri.scheme, ignoreCase = true) == true &&
+                candidate.host?.equals(allowedFrontendUri.host, ignoreCase = true) == true &&
+                effectivePort(candidate) == effectivePort(allowedFrontendUri)
+
+    private fun effectivePort(uri: URI): Int = when {
+        uri.port != -1 -> uri.port
+        uri.scheme?.equals("http", ignoreCase = true) == true -> 80
+        uri.scheme?.equals("https", ignoreCase = true) == true -> 443
+
+        else -> -1
     }
 }
