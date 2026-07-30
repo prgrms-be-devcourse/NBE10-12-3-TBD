@@ -79,7 +79,7 @@ class RestaurantService (
             "양식" in name -> Category.WESTERN
             "아시아음식" in name -> Category.ASIAN
             "카페" in name || "디저트" in name -> Category.CAFE
-            "한식" in name -> Category.SNACK
+            "분식" in name -> Category.SNACK
             else -> Category.ETC
         }
     }
