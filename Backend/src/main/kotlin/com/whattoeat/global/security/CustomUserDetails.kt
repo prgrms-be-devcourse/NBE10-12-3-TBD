@@ -1,15 +1,10 @@
 package com.whattoeat.global.security
 
 import com.whattoeat.domain.user.entity.User
-import lombok.Getter
-import lombok.RequiredArgsConstructor
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
-import java.util.List
 
-@Getter
-@RequiredArgsConstructor
 class CustomUserDetails(val user: User) : UserDetails {
 
     override fun getAuthorities(): Collection<GrantedAuthority> =
