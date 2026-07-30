@@ -9,7 +9,6 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.BDDMockito.given
-import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.mock.web.MockHttpServletRequest
@@ -29,7 +28,6 @@ class CustomOAuth2LoginSuccessHandlerTest {
     @Mock
     private lateinit var authentication: Authentication
 
-    @InjectMocks
     private lateinit var handler: CustomOAuth2LoginSuccessHandler
 
     private lateinit var req: MockHttpServletRequest
