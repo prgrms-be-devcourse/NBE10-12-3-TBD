@@ -11,6 +11,7 @@ import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.CommentNotFoundException
 import com.whattoeat.global.exception.FeedNotFoundException
 import com.whattoeat.global.exception.UserNotFoundException
+import org.springframework.security.access.AccessDeniedException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -149,6 +150,21 @@ internal class CommentServiceTest {
         assertThatThrownBy { commentService.deleteComment(999L, 1L, 1L) }
             .isInstanceOf(CommentNotFoundException::class.java)
             .hasMessageContaining("1")
+        then(commentRepository).should(never()).delete(comment)
+    }
+
+    @Test
+    fun deleteComment_타인의_댓글이면_예외발생() {
+        val owner = createUser("testUser")
+        val feed = createFeed(owner)
+        val comment = Comment(feed, owner, "댓글")
+
+        ReflectionTestUtils.setField(feed, "id", 1L)
+        ReflectionTestUtils.setField(owner, "id", 1L)
+
+        given(commentRepository.findById(1L)).willReturn(Optional.of(comment))
+        assertThatThrownBy { commentService.deleteComment(1L, 1L, 2L) }
+            .isInstanceOf(AccessDeniedException::class.java)
         then(commentRepository).should(never()).delete(comment)
     }
 }
