@@ -160,7 +160,7 @@ class FeedServiceTest {
         given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
 
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(any(), any()))
-            .willReturn(listOf(feed1.id))
+            .willReturn(listOf(feed1.id!!))
 
         val result: Page<FeedListResponse> = feedService.getFeeds(1L, null, null, pageable)
 
