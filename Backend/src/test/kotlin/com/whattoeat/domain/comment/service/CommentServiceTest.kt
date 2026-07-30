@@ -1,7 +1,6 @@
 package com.whattoeat.domain.comment.service
 
 import com.whattoeat.domain.comment.dto.CommentRequest
-import com.whattoeat.domain.comment.dto.CommentResponse
 import com.whattoeat.domain.comment.entity.Comment
 import com.whattoeat.domain.comment.repository.CommentRepository
 import com.whattoeat.domain.feed.entity.Feed
@@ -121,9 +120,11 @@ internal class CommentServiceTest {
         val comment = Comment(feed = feed, user = user, content = "댓글")
 
         ReflectionTestUtils.setField(feed, "id", 1L)
+        ReflectionTestUtils.setField(user, "id", 1L)
+
         given(commentRepository.findById(1L)).willReturn(Optional.of(comment))
 
-        commentService.deleteComment(1L, 1L)
+        commentService.deleteComment(1L, 1L, 1L)
 
         then(commentRepository).should().delete(comment)
     }
@@ -132,7 +133,7 @@ internal class CommentServiceTest {
     fun deleteComment_댓글이_없으면_예외발생() {
         given(commentRepository.findById(999L)).willReturn(Optional.empty())
 
-        assertThatThrownBy { commentService.deleteComment(1L, 999L) }
+        assertThatThrownBy { commentService.deleteComment(1L, 999L, 1L) }
             .isInstanceOf(CommentNotFoundException::class.java)
             .hasMessageContaining("999")
     }
@@ -145,7 +146,7 @@ internal class CommentServiceTest {
         val comment = Comment(feed = feed, user = user, content = "댓글")
         given(commentRepository.findById(1L)).willReturn(Optional.of(comment))
 
-        assertThatThrownBy { commentService.deleteComment(999L, 1L) }
+        assertThatThrownBy { commentService.deleteComment(999L, 1L, 1L) }
             .isInstanceOf(IllegalArgumentException::class.java)
         then(commentRepository).should(never()).delete(comment)
     }

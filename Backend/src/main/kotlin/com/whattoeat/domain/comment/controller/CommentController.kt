@@ -42,10 +42,11 @@ class CommentController(private val commentService: CommentService) {
     //댓글 삭제
     @DeleteMapping("/{feedId}/comments/{commentId}")
     fun deleteComment(
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
         @PathVariable feedId: Long,
         @PathVariable commentId: Long
     ): ResponseEntity<RsData<Void>> {
-        commentService.deleteComment(feedId, commentId)
+        commentService.deleteComment(feedId, commentId, userDetails.userId)
         return ResponseEntity.ok(success(null, "댓글이 삭제되었습니다."))
     }
 }

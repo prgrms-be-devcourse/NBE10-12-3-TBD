@@ -200,6 +200,6 @@ internal class CommentControllerTest {
                 MockMvcResultMatchers
                     .jsonPath("$.message").value("댓글이 삭제되었습니다.")
             )
-        then(commentService).should().deleteComment(1L, 1L)
+        then(commentService).should().deleteComment(1L, 1L, 1L)
     }
 }

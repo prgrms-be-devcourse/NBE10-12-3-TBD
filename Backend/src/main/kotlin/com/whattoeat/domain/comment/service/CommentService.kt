@@ -10,6 +10,7 @@ import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.CommentNotFoundException
 import com.whattoeat.global.exception.FeedNotFoundException
 import com.whattoeat.global.exception.UserNotFoundException
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -39,10 +40,11 @@ class CommentService(
     }
 
     @Transactional
-    fun deleteComment(feedId: Long, commentId: Long) {
+    fun deleteComment(feedId: Long, commentId: Long, userId: Long) {
         val comment = commentRepository.findById(commentId)
             .orElseThrow { CommentNotFoundException(commentId) }
-        require(comment.feed.id == feedId) { "해당 피드의 댓글이 아닙니다." }
+        if(comment.feed.id != feedId) throw CommentNotFoundException(commentId)
+        if(comment.user.id != userId) throw AccessDeniedException("본인이 작성한 댓글만 삭제할 수 있습니다.")
         commentRepository.delete(comment)
     }
 }
