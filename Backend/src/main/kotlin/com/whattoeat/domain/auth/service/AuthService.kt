@@ -1,6 +1,10 @@
 package com.whattoeat.domain.auth.service
 
-import com.whattoeat.domain.auth.dto.*
+import com.whattoeat.domain.auth.dto.AuthResult
+import com.whattoeat.domain.auth.dto.AuthUserResponse
+import com.whattoeat.domain.auth.dto.LoginRequest
+import com.whattoeat.domain.auth.dto.SignUpRequest
+import com.whattoeat.domain.auth.dto.TokenResponse
 import com.whattoeat.domain.user.entity.Provider
 import com.whattoeat.domain.user.entity.Role
 import com.whattoeat.domain.user.entity.User
@@ -48,13 +52,13 @@ class AuthService(
         val user = signup(request)
         val accessToken = jwtUtil.generateAccessToken(user)
         val refreshToken = jwtUtil.generateRefreshToken(user)
-        saveRefreshToken(user.id, refreshToken)
+        saveRefreshToken(checkNotNull(user.id){"회원가입된 사용자의 id가 없습니다."}, refreshToken)
         return AuthResult(accessToken, refreshToken, AuthUserResponse.from(user))
     }
 
     fun saveRefreshToken(userId: Long, refreshToken: String) {
         redisTemplate.opsForValue().set(
-            "refresh:" + userId,
+            "refresh:${userId}",
             refreshToken,
             Duration.ofDays(7)
         )
@@ -63,7 +67,7 @@ class AuthService(
     @Transactional
     fun reissue(refreshToken: String): TokenResponse {
         val userId = jwtUtil.getUserId(refreshToken)
-        val savedRefreshToken = redisTemplate.opsForValue().get("refresh:" + userId)
+        val savedRefreshToken = redisTemplate.opsForValue().get("refresh:${userId}")
         if (savedRefreshToken == null || savedRefreshToken != refreshToken) {
             throw InvalidCredentialsException("유효하지 않은 refreshToken입니다.")
         }
@@ -85,9 +89,10 @@ class AuthService(
         if (!passwordEncoder.matches(request.password, user.password)) {
             throw InvalidCredentialsException("아이디/비밀번호가 올바르지 않습니다.")
         }
+
         val accessToken = jwtUtil.generateAccessToken(user)
         val refreshToken = jwtUtil.generateRefreshToken(user)
-        saveRefreshToken(user.id, refreshToken)
+        saveRefreshToken(checkNotNull(user.id){"조회된 사용자의 ID가 없습니다."}, refreshToken)
         return AuthResult(accessToken, refreshToken, AuthUserResponse.from(user))
     }
 
@@ -96,7 +101,7 @@ class AuthService(
     fun createOAuthCode(userId: Long): String {
         val code: String = UUID.randomUUID().toString()
         redisTemplate.opsForValue().set(
-            "oauth-code:" + code,
+            "oauth-code:${code}",
             userId.toString(),
             Duration.ofSeconds(60)
         )
@@ -105,7 +110,7 @@ class AuthService(
 
     @Transactional
     fun exchangeOAuthCode(code: String): AuthResult {
-        val key = "oauth-code:" + code
+        val key = "oauth-code:${code}"
         val userIdValue = redisTemplate.opsForValue().get(key)
         redisTemplate.delete(key)
 
@@ -118,7 +123,7 @@ class AuthService(
 
         val accessToken = jwtUtil.generateAccessToken(user)
         val refreshToken = jwtUtil.generateRefreshToken(user)
-        saveRefreshToken(user.id, refreshToken)
+        saveRefreshToken(checkNotNull(user.id){"조회된 사용자의 ID가 없습니다."}, refreshToken)
         return AuthResult(accessToken, refreshToken, AuthUserResponse.from(user))
     }
 
