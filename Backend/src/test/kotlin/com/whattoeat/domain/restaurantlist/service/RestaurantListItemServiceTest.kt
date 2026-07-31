@@ -7,6 +7,7 @@ import com.whattoeat.domain.restaurantlist.entity.RestaurantList
 import com.whattoeat.domain.restaurantlist.entity.RestaurantListItem
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListItemRepository
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListRepository
+import com.whattoeat.domain.restaurantlist.repository.SavedRestaurantListRepository
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.DuplicateRestaurantListItemException
@@ -46,6 +47,9 @@ class RestaurantListItemServiceTest {
 
     @Mock
     lateinit var restaurantRepository: RestaurantRepository
+
+    @Mock
+    lateinit var savedRestaurantListRepository: SavedRestaurantListRepository
 
     @InjectMocks
     lateinit var restaurantListService: RestaurantListService
