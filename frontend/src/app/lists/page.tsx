@@ -33,6 +33,14 @@ interface RestaurantListsResponse {
   totalElements: number;
 }
 
+interface PopularListSummary extends ListSummary {
+  saveCount: number;
+}
+
+interface PopularRestaurantListsResponse {
+  lists: PopularListSummary[];
+}
+
 /* =========================================================
  * 리스트 안의 식당
  * ========================================================= */
@@ -138,6 +146,8 @@ function ListsPage() {
 
   const [publicLists, setPublicLists] = useState<ListSummary[]>([]);
 
+  const [popularLists, setPopularLists] = useState<PopularListSummary[]>([]);
+
   const [savedLists, setSavedLists] = useState<SavedListDetail[]>([]);
 
   /* ---------------------------------------------------------
@@ -187,6 +197,8 @@ function ListsPage() {
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState("");
+
+  const [popularError, setPopularError] = useState("");
 
   const [mapError, setMapError] = useState("");
 
@@ -241,11 +253,15 @@ function ListsPage() {
     try {
       setError("");
 
-      const [myRes, publicRes, savedRes] = await Promise.all([
+      const [myRes, publicRes, popularRes, savedRes] = await Promise.all([
         apiFetchJson<RestaurantListsResponse>("/api/v1/lists?page=0&size=10"),
 
         apiFetchJson<RestaurantListsResponse>(
           "/api/v1/lists/others?page=0&size=10",
+        ),
+
+        apiFetchJson<PopularRestaurantListsResponse>(
+          "/api/v1/lists/popular?size=5",
         ),
 
         apiFetchJson<{
@@ -281,6 +297,18 @@ function ListsPage() {
         setPublicLists([]);
         setPublicPage(0);
         setPublicTotalPages(0);
+      }
+
+      /* 인기 리스트 */
+
+      if (popularRes.ok && popularRes.data) {
+        setPopularLists(popularRes.data.lists);
+        setPopularError("");
+      } else {
+        setPopularLists([]);
+        setPopularError(
+          popularRes.message || "인기 리스트를 불러오지 못했습니다.",
+        );
       }
 
       /* 저장한 리스트 */
@@ -713,12 +741,6 @@ function ListsPage() {
    * ========================================================= */
 
   const otherLists = publicLists;
-
-  /* =========================================================
-   * 인기 맛집 리스트
-   * ========================================================= */
-
-  const popularLists = publicLists.slice(0, 5);
 
   /* =========================================================
    * 최근 생성된 리스트
@@ -1247,38 +1269,42 @@ function ListsPage() {
           <div className="sticky top-28 space-y-5">
             <SidebarProfile />
 
-            <SidebarCard title="인기 맛집 리스트">
-              <div className="space-y-4">
-                {popularLists.length === 0 ? (
-                  <p className="py-2 text-sm text-muted">
-                    등록된 공개 리스트가 없습니다.
-                  </p>
-                ) : (
-                  popularLists.map((list) => (
-                    <button
-                      key={list.id}
-                      type="button"
-                      onClick={() => handleSelectSidebarList(list.id)}
-                      className="block w-full rounded-xl bg-surface-soft p-4 text-left transition-colors hover:bg-hairline-soft/50"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-base font-bold text-ink">
-                          {list.title}
+            {(popularLists.length > 0 || popularError) && (
+              <SidebarCard title="인기 맛집 리스트">
+                <div className="space-y-4">
+                  {popularError ? (
+                    <p className="py-2 text-sm text-red-500">{popularError}</p>
+                  ) : (
+                    popularLists.map((list) => (
+                      <button
+                        key={list.id}
+                        type="button"
+                        onClick={() => handleSelectSidebarList(list.id)}
+                        className="block w-full rounded-xl bg-surface-soft p-4 text-left transition-colors hover:bg-hairline-soft/50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-base font-bold text-ink">
+                            {list.title}
+                          </p>
+
+                          <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
+                            {list.moodTag}
+                          </span>
+                        </div>
+
+                        <p className="mt-1.5 text-sm text-muted">
+                          by {list.nickname} · 식당 {list.itemCount}개
                         </p>
 
-                        <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                          {list.moodTag}
-                        </span>
-                      </div>
-
-                      <p className="mt-1.5 text-sm text-muted">
-                        by {list.nickname} · 식당 {list.itemCount}개
-                      </p>
-                    </button>
-                  ))
-                )}
-              </div>
-            </SidebarCard>
+                        <p className="mt-1 text-xs font-semibold text-primary">
+                          {list.saveCount}명이 저장
+                        </p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </SidebarCard>
+            )}
 
             <SidebarCard title="최근 생성된 리스트">
               <div className="space-y-4">
