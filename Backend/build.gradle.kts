@@ -86,3 +86,20 @@ spotless {
         endWithNewline()
     }
 }
+
+val installGitHooks by tasks.registering(Exec::class) {
+    group = "git hooks"
+    description = "Configures git to use .githooks/ from the repo root"
+
+    val repoRoot = rootDir.parentFile
+    val hooksDir = File(repoRoot, ".githooks")
+    val gitDir = File(repoRoot, ".git")
+
+    onlyIf { gitDir.exists() && hooksDir.exists() }
+
+    workingDir = repoRoot
+    commandLine("git", "config", "core.hooksPath", hooksDir.absolutePath)
+}
+
+tasks.matching { it.name == "compileKotlin" || it.name == "compileJava" }
+    .configureEach { dependsOn(installGitHooks) }
