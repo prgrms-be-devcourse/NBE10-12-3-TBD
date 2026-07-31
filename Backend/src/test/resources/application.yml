@@ -19,3 +19,8 @@ jwt:
   secret: dGVzdC1zZWNyZXQta2V5LWZvci10ZXN0aW5nLW9ubHktMTIzNDU2Nzg=
   access-expiration: 3600000
   refresh-expiration: 604800000
+
+app:
+  upload:
+    path: uploads
+    url-prefix: /uploads
