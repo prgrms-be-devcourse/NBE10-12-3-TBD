@@ -1,14 +1,11 @@
 package com.whattoeat.domain.restaurantlist.repository
 
-import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurantlist.entity.SavedRestaurantList
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
-import java.time.LocalDateTime
-
 import java.util.Optional
 
 interface SavedRestaurantListRepository : JpaRepository<SavedRestaurantList, Long> {
@@ -57,17 +54,4 @@ interface SavedRestaurantListRepository : JpaRepository<SavedRestaurantList, Lon
         excludedOwnerId: Long,
         pageable: Pageable
     ): List<PopularRestaurantListProjection>
-}
-
-
-interface PopularRestaurantListProjection {
-    val id: Long
-    val userId: Long
-    val nickname: String
-    val title: String
-    val description: String
-    val moodTag: MoodTag?
-    val itemCount: Long
-    val createdAt: LocalDateTime?
-    val saveCount: Long
 }
