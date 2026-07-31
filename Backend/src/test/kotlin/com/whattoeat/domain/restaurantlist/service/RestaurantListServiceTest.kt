@@ -811,7 +811,8 @@ class RestaurantListServiceTest {
         assertThat(popularList.title).isEqualTo("서울 데이트 맛집")
         assertThat(popularList.itemCount).isEqualTo(8L)
         assertThat(popularList.saveCount).isEqualTo(4L)
-        assertThat(popularList.createdAt).isEqualTo(createdAtValue)    }
+        assertThat(popularList.createdAt).isEqualTo(createdAtValue)
+    }
 
     @Test
     fun `인기 리스트 후보가 없으면 빈 목록을 반환한다`() {
