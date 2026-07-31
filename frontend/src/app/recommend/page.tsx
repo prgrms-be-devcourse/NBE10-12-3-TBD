@@ -197,9 +197,9 @@ export default function RecommendPage() {
 
   useEffect(() => {
     const loadHotPlaces = async () => {
-      const res = await apiFetchJson<HotPlace[]>("/api/v1/restaurants");
+      const res = await apiFetchJson<HotPlace[]>("/api/v1/restaurants/today-hot");
       if (res.ok && res.data) {
-        setHotPlaces(res.data.slice(0, 3));
+        setHotPlaces(res.data);
       }
     };
 
