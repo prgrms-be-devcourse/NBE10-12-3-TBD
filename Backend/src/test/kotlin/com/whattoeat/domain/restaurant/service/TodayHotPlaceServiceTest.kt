@@ -6,6 +6,7 @@ import com.whattoeat.domain.restaurant.repository.HotPlaceQueryRepository
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.global.entity.BaseEntity
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -186,7 +187,7 @@ class TodayHotPlaceServiceTest {
     }
 
     @Test
-    fun `DB 실패시 빈 리스트를 반환하고 예외를 던지지 않는다`() {
+    fun `DB 실패시 예외를 그대로 전파해 상위에서 5xx로 응답되게 한다`() {
         given(valueOps.get("today-hot:v1")).willReturn(null)
         given(
             hotPlaceQueryRepository.findTopRestaurantIdsSince(
@@ -194,8 +195,8 @@ class TodayHotPlaceServiceTest {
             )
         ).willThrow(RuntimeException("db down"))
 
-        val result = service.getTodayHotPlaces()
-
-        assertThat(result).isEmpty()
+        assertThatThrownBy { service.getTodayHotPlaces() }
+            .isInstanceOf(RuntimeException::class.java)
+            .hasMessage("db down")
     }
 }

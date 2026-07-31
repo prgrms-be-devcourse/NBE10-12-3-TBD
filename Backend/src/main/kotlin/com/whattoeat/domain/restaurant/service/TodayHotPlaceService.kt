@@ -22,19 +22,14 @@ class TodayHotPlaceService(
     private val objectMapper = ObjectMapper()
 
     fun getTodayHotPlaces(): List<Restaurant> {
-        return try {
-            val cachedIds = readCache()
-            if (cachedIds != null) {
-                fetchInOrder(cachedIds)
-            } else {
-                val ids = computeTopIds()
-                writeCache(ids)
-                fetchInOrder(ids)
-            }
-        } catch (e: RuntimeException) {
-            log.error("today-hot 조회 실패, 빈 목록 반환", e)
-            emptyList()
+        val cachedIds = readCache()
+        if (cachedIds != null) {
+            return fetchInOrder(cachedIds)
         }
+
+        val ids = computeTopIds()
+        writeCache(ids)
+        return fetchInOrder(ids)
     }
 
     private fun readCache(): List<Long>? {
