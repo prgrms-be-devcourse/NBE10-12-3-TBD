@@ -7,11 +7,13 @@ import com.whattoeat.domain.restaurantlist.entity.RestaurantListItem
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListItemRepository
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListRepository
 import com.whattoeat.domain.restaurantlist.repository.SavedRestaurantListRepository
+import com.whattoeat.domain.restaurantlist.dto.RestaurantListResponse
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.*
 import jakarta.persistence.EntityManager
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -224,5 +226,33 @@ class RestaurantListService(
         pageable: Pageable
     ): Page<RestaurantList> {
         return restaurantListRepository.findByUserIdNot(userId, pageable)
+    }
+
+    @Transactional(readOnly = true)
+    fun findPopularLists(
+        userId: Long,
+        size: Int
+    ): List<RestaurantListResponse.PopularRestaurantList> {
+        val limit = size.coerceIn(1, 5)
+        val pageable = PageRequest.of(0, limit)
+
+        return savedRestaurantListRepository
+            .findPopularLists(
+                userId,
+                pageable
+            )
+            .map { projection ->
+                RestaurantListResponse.PopularRestaurantList(
+                    id = projection.id,
+                    userId = projection.userId,
+                    nickname = projection.nickname,
+                    title = projection.title,
+                    description = projection.description,
+                    moodTag = projection.moodTag,
+                    itemCount = projection.itemCount,
+                    createdAt = projection.createdAt,
+                    saveCount = projection.saveCount
+                )
+            }
     }
 }

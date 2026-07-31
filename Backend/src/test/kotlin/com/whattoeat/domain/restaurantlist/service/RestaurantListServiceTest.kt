@@ -5,6 +5,7 @@ import com.whattoeat.domain.restaurant.entity.Restaurant
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.domain.restaurantlist.entity.RestaurantList
 import com.whattoeat.domain.restaurantlist.entity.RestaurantListItem
+import com.whattoeat.domain.restaurantlist.repository.PopularRestaurantListProjection
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListItemRepository
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListRepository
 import com.whattoeat.domain.restaurantlist.repository.SavedRestaurantListRepository
@@ -32,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.util.ReflectionTestUtils
+import java.time.LocalDateTime
 import java.util.Optional
 
 @ExtendWith(MockitoExtension::class)
@@ -760,5 +762,74 @@ class RestaurantListServiceTest {
         then(restaurantListRepository).should(never())
             .delete(any(RestaurantList::class.java))
 
+    }
+    @Test
+    fun `인기 리스트 조회 결과를 응답 DTO로 변환한다`() {
+        val requestUserId = 1L
+        val createdAtValue = LocalDateTime.of(
+            2026,
+            7,
+            31,
+            12,
+            0
+        )
+
+        val projection = object : PopularRestaurantListProjection {
+            override val id = 10L
+            override val userId = 2L
+            override val nickname = "맛집탐험가"
+            override val title = "서울 데이트 맛집"
+            override val description = "분위기 좋은 식당"
+            override val moodTag = MoodTag.DATE
+            override val itemCount = 8L
+            override val createdAt = createdAtValue
+            override val saveCount = 4L
+        }
+
+        val pageable = PageRequest.of(0, 5)
+
+        given(
+            savedRestaurantListRepository.findPopularLists(
+                requestUserId,
+                pageable
+            )
+        ).willReturn(listOf(projection))
+
+        val result = restaurantListService.findPopularLists(
+            userId = requestUserId,
+            size = 100
+        )
+
+        assertThat(result).hasSize(1)
+
+
+        val popularList = result.first()
+
+        assertThat(popularList.id).isEqualTo(10L)
+        assertThat(popularList.userId).isEqualTo(2L)
+        assertThat(popularList.nickname).isEqualTo("맛집탐험가")
+        assertThat(popularList.title).isEqualTo("서울 데이트 맛집")
+        assertThat(popularList.itemCount).isEqualTo(8L)
+        assertThat(popularList.saveCount).isEqualTo(4L)
+        assertThat(popularList.createdAt).isEqualTo(createdAtValue)    }
+
+    @Test
+    fun `인기 리스트 후보가 없으면 빈 목록을 반환한다`() {
+        val requestUserId = 1L
+        val pageable = PageRequest.of(0, 5)
+
+        given(
+            savedRestaurantListRepository.findPopularLists(
+                requestUserId,
+                pageable
+            )
+        ).willReturn(emptyList())
+
+        val result = restaurantListService.findPopularLists(
+            userId = requestUserId,
+            size = 5
+        )
+
+        assertThat(result).isEmpty()
     }
 }

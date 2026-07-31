@@ -6,6 +6,7 @@ import com.whattoeat.domain.restaurant.entity.Category
 import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurant.entity.Restaurant
 import com.whattoeat.domain.restaurantlist.dto.RestaurantListRequest
+import com.whattoeat.domain.restaurantlist.dto.RestaurantListResponse
 import com.whattoeat.domain.restaurantlist.entity.RestaurantList
 import com.whattoeat.domain.restaurantlist.entity.RestaurantListItem
 import com.whattoeat.domain.restaurantlist.service.RestaurantListService
@@ -653,6 +654,84 @@ class RestaurantListControllerTest {
             )
 
         then(restaurantListService).should().delete(listId,TEST_USER_ID)
+    }
+
+    @Test
+    fun `가장 많이 저장된 맛집 리스트 조회 성공`() {
+        val popularList =
+            RestaurantListResponse.PopularRestaurantList(
+                id = 10L,
+                userId = 2L,
+                nickname = "맛집탐험가",
+                title = "서울 데이트 맛집",
+                description = "분위기 좋은 식당",
+                moodTag = MoodTag.DATE,
+                itemCount = 8L,
+                createdAt = LocalDateTime.of(
+                    2026,
+                    7,
+                    31,
+                    12,
+                    0
+                ),
+                saveCount = 4L
+            )
+
+        given(
+            restaurantListService.findPopularLists(
+                TEST_USER_ID,
+                5
+            )
+        ).willReturn(listOf(popularList))
+
+        mockMvc.perform(
+            get("/api/v1/lists/popular")
+                .param("size", "5")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.lists").isArray)
+            .andExpect(jsonPath("$.data.lists.length()").value(1))
+            .andExpect(jsonPath("$.data.lists[0].id").value(10))
+            .andExpect(jsonPath("$.data.lists[0].userId").value(2))
+            .andExpect(
+                jsonPath("$.data.lists[0].nickname")
+                    .value("맛집탐험가")
+            )
+            .andExpect(
+                jsonPath("$.data.lists[0].title")
+                    .value("서울 데이트 맛집")
+            )
+            .andExpect(
+                jsonPath("$.data.lists[0].itemCount")
+                    .value(8)
+            )
+            .andExpect(
+                jsonPath("$.data.lists[0].saveCount")
+                    .value(4)
+            )
+            .andExpect(
+                jsonPath("$.message")
+                    .value("인기 맛집 리스트 조회가 완료되었습니다.")
+            )
+    }
+
+    @Test
+    fun `인기 리스트가 없으면 빈 배열을 반환한다`() {
+        given(
+            restaurantListService.findPopularLists(
+                TEST_USER_ID,
+                5
+            )
+        ).willReturn(emptyList())
+
+        mockMvc.perform(
+            get("/api/v1/lists/popular")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.lists").isArray)
+            .andExpect(jsonPath("$.data.lists").isEmpty)
     }
 
 
