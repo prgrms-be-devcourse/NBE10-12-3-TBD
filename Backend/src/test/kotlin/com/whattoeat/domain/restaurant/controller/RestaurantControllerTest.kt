@@ -3,6 +3,7 @@ package com.whattoeat.domain.restaurant.controller
 import com.whattoeat.domain.restaurant.entity.Category
 import com.whattoeat.domain.restaurant.entity.Restaurant
 import com.whattoeat.domain.restaurant.service.RestaurantService
+import com.whattoeat.domain.restaurant.service.TodayHotPlaceService
 import com.whattoeat.global.exception.RestaurantNotFoundException
 import com.whattoeat.global.jwt.JwtUtil
 import com.whattoeat.global.security.CustomUserDetailsService
@@ -32,6 +33,9 @@ class RestaurantControllerTest {
 
     @MockitoBean
     lateinit var restaurantService: RestaurantService
+
+    @MockitoBean
+    lateinit var todayHotPlaceService: TodayHotPlaceService
 
     @MockitoBean
     lateinit var jwtUtil: JwtUtil
@@ -299,5 +303,22 @@ class RestaurantControllerTest {
             get("/api/v1/restaurants/999")
         )
             .andExpect(status().isNotFound)
+    }
+
+    @Test
+    @DisplayName("GET /today-hot 은 서비스 결과를 Recommend 배열로 감싸 반환한다")
+    fun `getTodayHotPlaces returns top3`() {
+        val r1 = createRestaurant("k1", "핫플1", Category.KOREAN)
+        val r2 = createRestaurant("k2", "핫플2", Category.JAPANESE)
+        val r3 = createRestaurant("k3", "핫플3", Category.WESTERN)
+        given(todayHotPlaceService.getTodayHotPlaces())
+            .willReturn(listOf(r1, r2, r3))
+
+        mockMvc.perform(get("/api/v1/restaurants/today-hot"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data").isArray)
+            .andExpect(jsonPath("$.data.length()").value(3))
+            .andExpect(jsonPath("$.data[0].name").value("핫플1"))
+            .andExpect(jsonPath("$.data[2].name").value("핫플3"))
     }
 }
