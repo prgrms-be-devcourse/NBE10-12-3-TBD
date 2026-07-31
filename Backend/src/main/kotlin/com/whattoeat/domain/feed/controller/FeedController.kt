@@ -65,7 +65,7 @@ class FeedController(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
         pageable: Pageable,
     ): RsData<FeedListPageResponse> {
-        val page = feedService.getRandomRecommendedFeeds(userDetails.userId, pageable)
+        val page = feedService.getRecommendedFeeds(userDetails.userId, pageable)
         return RsData.success(FeedListPageResponse.from(page), "추천 피드 조회가 완료되었습니다.")
     }
 

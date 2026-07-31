@@ -15,8 +15,12 @@ import com.whattoeat.domain.user.entity.User
 import com.whattoeat.global.exception.FeedNotFoundException
 import com.whattoeat.global.upload.ImageUploadService
 import java.io.IOException
+import java.time.Duration
+import java.time.LocalDateTime
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
@@ -33,6 +37,16 @@ import org.springframework.web.multipart.MultipartFile
     private val feedLikeRepository: FeedLikeRepository,
     private val imageUploadService: ImageUploadService,
 ) {
+    companion object {
+        // 추천 후보로 가져올 최신 피드 최대 개수 (전체 스캔 방지용 상한)
+        private const val RECOMMEND_CANDIDATE_LIMIT = 300
+        private const val LIKE_WEIGHT = 1.0
+        private const val COMMENT_WEIGHT = 2.0
+        private const val SECOND_DEGREE_AUTHOR_BONUS = 6.0
+        private const val FOLLOWING_LIKE_BONUS = 3.0
+        private const val TIME_DECAY_PER_HOUR = 0.015
+    }
+
     @Transactional
     @Throws(IOException::class)
      fun createFeed(
@@ -131,7 +145,7 @@ import org.springframework.web.multipart.MultipartFile
     }
 
     @Transactional(readOnly = true)
-     fun getRandomRecommendedFeeds(userId: Long?, pageable: Pageable): Page<FeedListResponse> {
+     fun getRecommendedFeeds(userId: Long?, pageable: Pageable): Page<FeedListResponse> {
         if (userId == null) return Page.empty(pageable)
 
         val followingUserIds =
@@ -140,25 +154,90 @@ import org.springframework.web.multipart.MultipartFile
                 .content
                 .map { it.following.id!! }
 
-        val feeds =
+        // 팔로우 탭(getFollowingFeeds)에서 이미 보여주는 글이므로 추천 후보에서는 나 자신과
+        // 내가 팔로우하는 사람들의 글을 모두 제외한다.
+        val excludedUserIds = (followingUserIds + userId).toHashSet()
+
+        val candidates =
+            feedRepository
+                .findByUser_IdNotInOrderByIdDesc(excludedUserIds, PageRequest.of(0, RECOMMEND_CANDIDATE_LIMIT))
+                .content
+
+        if (candidates.isEmpty()) {
+            return Page.empty(pageable)
+        }
+
+        val commentCounts = countCommentByFeedIds(candidates)
+        val likedFeedIds = findLikedFeedIds(userId, candidates)
+
+        // 내가 팔로우하는 사람들이 팔로우하는 사람(2차 팔로우)의 글, 그리고 그들이 좋아요한 글을 가산점 신호로 사용한다.
+        val secondDegreeAuthorIds =
             if (followingUserIds.isEmpty()) {
-                feedRepository.findAllByOrderByIdDesc(pageable)
+                emptySet()
             } else {
-                feedRepository.findByUser_IdNotInOrderByIdDesc(followingUserIds, pageable)
+                followRepository.findFollowingIdsByFollowerIds(followingUserIds).toHashSet()
+            }
+        val likedByFollowingFeedIds =
+            if (followingUserIds.isEmpty()) {
+                emptySet()
+            } else {
+                feedLikeRepository.findFeedIdsLikedByUserIds(followingUserIds).toHashSet()
             }
 
-        val feedContents = feeds.content
-        val commentCounts = countCommentByFeedIds(feedContents)
-        val likedFeedIds = findLikedFeedIds(userId, feedContents)
+        val ranked =
+            candidates.sortedByDescending { feed ->
+                recommendationScore(
+                    feed = feed,
+                    commentCount = commentCounts.getOrDefault(feed.id, 0L),
+                    isFromSecondDegreeFollowing = secondDegreeAuthorIds.contains(feed.user.id),
+                    isLikedByFollowing = likedByFollowingFeedIds.contains(feed.id),
+                )
+            }
 
-        return feeds.map { feed ->
-            FeedListResponse.from(
-                feed,
-                commentCounts.getOrDefault(feed.id, 0L),
-                likedFeedIds.contains(feed.id),
-            )
+        val start = pageable.offset.toInt()
+        if (start >= ranked.size) {
+            return PageImpl(emptyList(), pageable, ranked.size.toLong())
         }
+        val end = minOf(start + pageable.pageSize, ranked.size)
+
+        val content =
+            ranked.subList(start, end).map { feed ->
+                FeedListResponse.from(
+                    feed,
+                    commentCounts.getOrDefault(feed.id, 0L),
+                    likedFeedIds.contains(feed.id),
+                )
+            }
+
+        return PageImpl(content, pageable, ranked.size.toLong())
     }
+
+    // 좋아요/댓글 수는 로그 스케일로 눌러 소수의 인기글이 점수를 독식하지 않게 하고,
+    // 팔로우 신호(2차 팔로우 작성자 / 팔로우한 사람이 좋아요)는 가산점으로 반영,
+    // 오래된 글은 시간당 소폭 감쇠시켜 신선도를 유지한다.
+    private fun recommendationScore(
+        feed: Feed,
+        commentCount: Long,
+        isFromSecondDegreeFollowing: Boolean,
+        isLikedByFollowing: Boolean,
+    ): Double {
+        val engagementScore =
+            LIKE_WEIGHT * ln1p(feed.likeCount.toDouble()) + COMMENT_WEIGHT * ln1p(commentCount.toDouble())
+
+        val socialBonus =
+            (if (isFromSecondDegreeFollowing) SECOND_DEGREE_AUTHOR_BONUS else 0.0) +
+                (if (isLikedByFollowing) FOLLOWING_LIKE_BONUS else 0.0)
+
+        val freshnessPenalty =
+            feed.createdAt?.let { createdAt ->
+                val hoursSinceCreated = Duration.between(createdAt, LocalDateTime.now()).toHours()
+                TIME_DECAY_PER_HOUR * maxOf(hoursSinceCreated, 0L).toDouble()
+            } ?: 0.0
+
+        return engagementScore + socialBonus - freshnessPenalty
+    }
+
+    private fun ln1p(value: Double): Double = kotlin.math.ln(1 + value)
 
     @Transactional
     @Throws(IOException::class)
