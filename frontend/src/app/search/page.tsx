@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Navigation, Search } from "lucide-react";
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
@@ -362,10 +363,10 @@ function SearchPage() {
    */
   useEffect(() => {
     const loadHotPlaces = async () => {
-      const res = await apiFetchJson<HotPlace[]>("/api/v1/restaurants");
+      const res = await apiFetchJson<HotPlace[]>("/api/v1/restaurants/today-hot");
 
       if (res.ok && res.data) {
-        setHotPlaces(res.data.slice(0, 3));
+        setHotPlaces(res.data);
       }
     };
 
@@ -940,7 +941,11 @@ function SearchPage() {
                 <p className="text-sm text-muted">등록된 식당이 없습니다.</p>
               ) : (
                 hotPlaces.map((place, index) => (
-                  <div key={place.id} className="flex items-start gap-3">
+                  <Link
+                    key={place.id}
+                    href={`/restaurant/${place.id}`}
+                    className="flex items-start gap-3 rounded-lg p-2 -m-2 transition-colors hover:bg-primary/5"
+                  >
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                       {index + 1}
                     </span>
@@ -958,7 +963,7 @@ function SearchPage() {
                         {place.region2 || "-"}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>

@@ -1,10 +1,10 @@
 package com.whattoeat.domain.feedlike.repository
 
 import com.whattoeat.domain.feedlike.entity.FeedLike
+import java.util.Optional
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import java.util.Optional
 
 interface FeedLikeRepository : JpaRepository<FeedLike, Long> {
     fun existsByFeed_IdAndUser_Id(feedId: Long, userId: Long): Boolean
@@ -15,23 +15,23 @@ interface FeedLikeRepository : JpaRepository<FeedLike, Long> {
 
     @Query(
         """
-    select fl.feed.id
-    from FeedLike fl
-    where fl.user.id = :userId
-      and fl.feed.id in :feedIds
-""",
+        select fl.feed.id
+        from FeedLike fl
+        where fl.user.id = :userId
+          and fl.feed.id in :feedIds
+        """,
     )
     fun findLikedFeedIdsByUserIdAndFeedIds(
-        @Param("userId") userId: Long,
-        @Param("feedIds") feedIds: List<Long>,
+        @Param("userId") userId: Long?,
+        @Param("feedIds") feedIds: List<Long>?,
     ): List<Long>
 
     @Query(
         """
-    select distinct fl.feed.id
-    from FeedLike fl
-    where fl.user.id in :userIds
-""",
+        select distinct fl.feed.id
+        from FeedLike fl
+        where fl.user.id in :userIds
+        """,
     )
     fun findFeedIdsLikedByUserIds(@Param("userIds") userIds: Collection<Long>): List<Long>
 }

@@ -76,6 +76,7 @@ Backend/build/
 /.claude/
 /.understand-anything/
 /skills-lock.json
+/docs/superpowers/
 /Backend/application.yaml
 .DS_Store
 

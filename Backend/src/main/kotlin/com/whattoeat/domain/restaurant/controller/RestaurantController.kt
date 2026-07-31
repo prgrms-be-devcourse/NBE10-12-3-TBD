@@ -4,6 +4,7 @@ import com.whattoeat.domain.restaurant.dto.RestaurantRequest;
 import com.whattoeat.domain.restaurant.dto.RestaurantResponse;
 import com.whattoeat.domain.restaurant.entity.Category;
 import com.whattoeat.domain.restaurant.service.RestaurantService;
+import com.whattoeat.domain.restaurant.service.TodayHotPlaceService;
 import com.whattoeat.global.rsData.RsData;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -12,8 +13,17 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/restaurants")
 class RestaurantController(
-    private val restaurantService: RestaurantService
+    private val restaurantService: RestaurantService,
+    private val todayHotPlaceService: TodayHotPlaceService
 ) {
+    // 오늘의 핫플 TOP 3 (인증 불필요)
+    @GetMapping("/today-hot")
+    fun getTodayHotPlaces(): RsData<List<RestaurantResponse.Recommend>> {
+        val data = todayHotPlaceService.getTodayHotPlaces()
+            .map { RestaurantResponse.Recommend(it) }
+        return RsData.success(data, "오늘의 핫플 조회가 완료되었습니다.")
+    }
+
     //식당 추천조회
     @GetMapping("/recommend")
     fun recommend(

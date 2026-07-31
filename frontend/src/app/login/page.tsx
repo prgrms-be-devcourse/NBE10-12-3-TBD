@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MessageCircle, Map, List, Sparkles } from "lucide-react";
 import { apiFetchJson } from "@/lib/api";
 
@@ -50,9 +51,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     const loadHotPlaces = async () => {
-      const res = await apiFetchJson<HotPlace[]>("/api/v1/restaurants");
+      const res = await apiFetchJson<HotPlace[]>("/api/v1/restaurants/today-hot");
       if (res.ok && res.data) {
-        setHotPlaces(res.data.slice(0, 3));
+        setHotPlaces(res.data);
       }
     };
 
@@ -155,13 +156,17 @@ export default function LoginPage() {
                 <p className="text-xs text-white/80">등록된 식당이 없습니다.</p>
               ) : (
                 hotPlaces.map((p) => (
-                  <div key={p.id} className="min-w-[160px] rounded-xl bg-white/15 p-3 backdrop-blur-sm">
+                  <Link
+                    key={p.id}
+                    href={`/restaurant/${p.id}`}
+                    className="min-w-[160px] rounded-xl bg-white/15 p-3 backdrop-blur-sm transition-colors hover:bg-white/25"
+                  >
                     <div className="h-20 rounded-lg bg-white/20 overflow-hidden mb-2">
                       <img src="/restaurant-placeholder.png" alt="" className="h-full w-full object-cover" />
                     </div>
                     <p className="text-sm font-bold truncate">{p.name}</p>
                     <p className="text-xs text-white/80">{categoryLabelMap[p.category] || p.category} · {p.region2 || "-"}</p>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>

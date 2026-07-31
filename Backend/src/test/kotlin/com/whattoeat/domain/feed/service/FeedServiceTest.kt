@@ -159,7 +159,7 @@ class FeedServiceTest {
         val pageable = PageRequest.of(0, 10)
         given(feedRepository.findAllByOrderByIdDesc(pageable))
             .willReturn(PageImpl(listOf(feed1, feed2), pageable, 2))
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(listOf(1L, 2L))).willReturn(emptyList())
 
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(listOf(feed1.id!!))
@@ -294,7 +294,7 @@ class FeedServiceTest {
         given(feedRepository.findByUser_IdInOrderByIdDesc(listOf(2L), pageable))
             .willReturn(PageImpl(listOf(user2Feed), pageable, 1))
 
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(listOf(10L))).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(emptyList())
 
@@ -328,7 +328,7 @@ class FeedServiceTest {
         given(feedRepository.findByUser_IdNotInOrderByIdDesc(setOf(1L), PageRequest.of(0, 300)))
             .willReturn(PageImpl(listOf(user2Feed)))
 
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(emptyList())
 
@@ -359,7 +359,7 @@ class FeedServiceTest {
             .willReturn(PageImpl(listOf(strangerFeed)))
 
         given(followRepository.findFollowingIdsByFollowerIds(listOf(2L))).willReturn(emptyList())
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(emptyList())
         given(feedLikeRepository.findFeedIdsLikedByUserIds(listOf(2L))).willReturn(emptyList())
@@ -396,7 +396,7 @@ class FeedServiceTest {
             .willReturn(PageImpl(listOf(plainFeed, likedByFollowingFeed, secondDegreeFeed)))
 
         given(followRepository.findFollowingIdsByFollowerIds(listOf(2L))).willReturn(listOf(5L))
-        given(commentRepository.countByFeedIds(any())).willReturn(emptyList())
+        given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(emptyList())
         given(feedLikeRepository.findFeedIdsLikedByUserIds(listOf(2L)))
