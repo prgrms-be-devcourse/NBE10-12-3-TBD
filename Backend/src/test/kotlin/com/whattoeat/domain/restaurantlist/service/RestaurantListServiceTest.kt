@@ -733,7 +733,7 @@ class RestaurantListServiceTest {
     fun `맛집리스트 삭제성공`() {
         val listId = 1L
         val userId = 1L
-류        val user = mock(User::class.java)
+        val user = mock(User::class.java)
         val restaurantList = createRestaurantList(listId, user)
 
         given(restaurantListRepository.findByIdAndUserId(listId,userId))
