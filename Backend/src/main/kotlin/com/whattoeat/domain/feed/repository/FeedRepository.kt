@@ -20,5 +20,12 @@ interface FeedRepository : JpaRepository<Feed, Long> {
     fun findByUser_IdNotInOrderByIdDesc(userIds: Collection<Long>, pageable: Pageable): Page<Feed>
 
     @EntityGraph(attributePaths = ["user", "restaurant"])
+    fun findByUser_IdNotInAndIdLessThanOrderByIdDesc(
+        userIds: Collection<Long>,
+        feedId: Long,
+        pageable: Pageable,
+    ): Page<Feed>
+
+    @EntityGraph(attributePaths = ["user", "restaurant"])
     fun findByUser_IdInOrderByIdDesc(userIds: Collection<Long>, pageable: Pageable): Page<Feed>
 }

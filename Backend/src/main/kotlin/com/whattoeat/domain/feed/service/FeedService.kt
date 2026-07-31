@@ -145,7 +145,7 @@ import org.springframework.web.multipart.MultipartFile
     }
 
     @Transactional(readOnly = true)
-     fun getRecommendedFeeds(userId: Long?, pageable: Pageable): Page<FeedListResponse> {
+     fun getRecommendedFeeds(userId: Long?, pageable: Pageable, beforeFeedId: Long? = null): Page<FeedListResponse> {
         if (userId == null) return Page.empty(pageable)
 
         val followingUserIds =
@@ -158,10 +158,16 @@ import org.springframework.web.multipart.MultipartFile
         // 내가 팔로우하는 사람들의 글을 모두 제외한다.
         val excludedUserIds = (followingUserIds + userId).toHashSet()
 
+        // beforeFeedId가 주어지면(새로고침) 이전 배치보다 오래된 다음 300개를 후보로 가져온다.
+        val candidatePage = PageRequest.of(0, RECOMMEND_CANDIDATE_LIMIT)
         val candidates =
-            feedRepository
-                .findByUser_IdNotInOrderByIdDesc(excludedUserIds, PageRequest.of(0, RECOMMEND_CANDIDATE_LIMIT))
-                .content
+            if (beforeFeedId == null) {
+                feedRepository.findByUser_IdNotInOrderByIdDesc(excludedUserIds, candidatePage).content
+            } else {
+                feedRepository
+                    .findByUser_IdNotInAndIdLessThanOrderByIdDesc(excludedUserIds, beforeFeedId, candidatePage)
+                    .content
+            }
 
         if (candidates.isEmpty()) {
             return Page.empty(pageable)

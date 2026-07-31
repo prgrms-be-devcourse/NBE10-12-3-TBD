@@ -408,4 +408,31 @@ class FeedServiceTest {
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
             .containsExactly(10L, 20L, 30L)
     }
+
+    @Test
+    @DisplayName("beforeFeedId가 주어지면 그보다 오래된 다음 300개를 후보로 가져온다")
+    fun getRecommendedFeeds_refreshesWithBeforeFeedId() {
+        val me = createTestUser(1L, "me")
+        val stranger = createTestUser(2L, "stranger")
+
+        val olderFeed = createTestFeed(5L, stranger, "older feed")
+
+        val pageable = PageRequest.of(0, 10)
+
+        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
+            .willReturn(PageImpl(emptyList()))
+
+        given(feedRepository.findByUser_IdNotInAndIdLessThanOrderByIdDesc(setOf(1L), 100L, PageRequest.of(0, 300)))
+            .willReturn(PageImpl(listOf(olderFeed)))
+
+        given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
+        given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
+            .willReturn(emptyList())
+
+        val result: Page<FeedListResponse> = feedService.getRecommendedFeeds(me.id, pageable, beforeFeedId = 100L)
+
+        assertThat(result.content)
+            .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
+            .containsExactly(olderFeed.id)
+    }
 }

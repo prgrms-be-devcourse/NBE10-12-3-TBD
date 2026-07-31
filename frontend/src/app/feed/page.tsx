@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Plus,
   Pencil,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import AppShell, { SidebarProfile, SidebarCard } from "@/components/AppShell";
@@ -57,6 +58,7 @@ function FeedContent() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [recommendCursor, setRecommendCursor] = useState<number | null>(null);
   const [recommendFoodies, setRecommendFoodies] = useState<RecommendFoodie[]>(
     [],
   );
@@ -123,8 +125,12 @@ function FeedContent() {
         activeTab === "following"
           ? "/api/v1/feeds/following"
           : "/api/v1/feeds/recommend";
+      const cursorParam =
+        activeTab === "recommended" && recommendCursor !== null
+          ? `&beforeFeedId=${recommendCursor}`
+          : "";
       const res = await apiFetchJson<FeedListPageResponse>(
-        `${endpoint}?page=${page}&size=20`,
+        `${endpoint}?page=${page}&size=20${cursorParam}`,
       );
 
       if (res.ok && res.data) {
@@ -144,7 +150,16 @@ function FeedContent() {
     };
 
     load();
-  }, [activeTab, page]);
+  }, [activeTab, page, recommendCursor]);
+
+  const handleRefreshRecommend = () => {
+    if (posts.length === 0) return;
+    const oldestFeedId = Math.min(...posts.map((post) => post.feedId));
+    setRecommendCursor(oldestFeedId);
+    setPosts([]);
+    setHasMore(true);
+    setPage(0);
+  };
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -252,6 +267,7 @@ function FeedContent() {
   const handleTabChange = (tab: "following" | "recommended") => {
     setPage(0);
     setPosts([]);
+    setRecommendCursor(null);
     router.replace(`/feed?tab=${tab}`, { scroll: false });
   };
 
@@ -494,6 +510,23 @@ function FeedContent() {
                 불러오는 중...
               </div>
             )}
+            {!loadingMore &&
+              !hasMore &&
+              activeTab === "recommended" &&
+              posts.length > 0 && (
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <p className="text-sm text-muted">
+                    새로운 추천을 더 받아볼까요?
+                  </p>
+                  <button
+                    onClick={handleRefreshRecommend}
+                    className="flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-4 py-2 text-sm font-bold text-ink hover:bg-surface-soft transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    새로고침
+                  </button>
+                </div>
+              )}
           </div>
         )}
       </div>
