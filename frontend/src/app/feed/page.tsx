@@ -224,6 +224,7 @@ function FeedContent() {
         restaurantId: post.restaurantId,
         restaurantName: post.restaurantName,
         imageUrl: post.imageUrl,
+        returnUrl: `${window.location.pathname}${window.location.search}`,
       }),
     );
 

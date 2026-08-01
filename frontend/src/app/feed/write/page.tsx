@@ -42,6 +42,7 @@ interface EditingFeed {
   restaurantId: number | null;
   restaurantName: string | null;
   imageUrl?: string | null;
+  returnUrl?: string;
 }
 
 const guideItems = [
@@ -358,10 +359,9 @@ function WritePostContent() {
     } else {
       formData.append(
         "feed",
-        new Blob(
-          [JSON.stringify({ content: content.trim(), restaurantId })],
-          { type: "application/json" },
-        ),
+        new Blob([JSON.stringify({ content: content.trim(), restaurantId })], {
+          type: "application/json",
+        }),
       );
       if (feedImageFile) {
         formData.append("image", feedImageFile);
@@ -378,11 +378,20 @@ function WritePostContent() {
     const feedJson = await feedRes.json().catch(() => ({}));
 
     if (feedRes.ok) {
+      let returnUrl = "/feed";
+
       if (isEditMode) {
+        const raw = sessionStorage.getItem("editingFeed");
+
+        if (raw) {
+          const editingFeed = JSON.parse(raw) as EditingFeed;
+          returnUrl = editingFeed.returnUrl ?? "/feed";
+        }
+
         sessionStorage.removeItem("editingFeed");
       }
 
-      router.push("/feed");
+      router.push(returnUrl);
     } else {
       alert(
         feedJson.message ||
