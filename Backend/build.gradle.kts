@@ -86,3 +86,34 @@ spotless {
         endWithNewline()
     }
 }
+
+val installGitHooks by tasks.registering(Exec::class) {
+    group = "git hooks"
+    description = "Configures git to use .githooks/ (skipped if core.hooksPath is already set)"
+
+    val repoRoot = rootDir.parentFile
+    val hooksDir = File(repoRoot, ".githooks")
+    val gitDir = File(repoRoot, ".git")
+
+    onlyIf {
+        if (!gitDir.exists() || !hooksDir.exists()) return@onlyIf false
+        val current = try {
+            val proc = ProcessBuilder("git", "config", "--get", "core.hooksPath")
+                .directory(repoRoot)
+                .redirectErrorStream(true)
+                .start()
+            val output = proc.inputStream.bufferedReader().readText().trim()
+            proc.waitFor()
+            output
+        } catch (e: Exception) {
+            ""
+        }
+        current.isEmpty()
+    }
+
+    workingDir = repoRoot
+    commandLine("git", "config", "core.hooksPath", hooksDir.absolutePath)
+}
+
+tasks.matching { it.name == "compileKotlin" || it.name == "compileJava" }
+    .configureEach { dependsOn(installGitHooks) }
