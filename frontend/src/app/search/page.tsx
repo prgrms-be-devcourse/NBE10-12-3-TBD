@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MapPin, Navigation, Search } from "lucide-react";
+import Link from "next/link";
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
 
@@ -597,7 +598,9 @@ function SearchPage() {
    */
   useEffect(() => {
     const loadHotPlaces = async () => {
-      const res = await apiFetchJson<HotPlace[]>("/api/v1/restaurants/today-hot");
+      const res = await apiFetchJson<HotPlace[]>(
+        "/api/v1/restaurants/today-hot",
+      );
 
       if (res.ok && res.data) {
         setHotPlaces(res.data);
