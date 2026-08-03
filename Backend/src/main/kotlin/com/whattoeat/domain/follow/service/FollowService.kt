@@ -2,12 +2,14 @@ package com.whattoeat.domain.follow.service
 
 import com.whattoeat.domain.follow.entity.Follow
 import com.whattoeat.domain.follow.repository.FollowRepository
+import com.whattoeat.domain.notification.event.FollowedEvent
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.AlreadyFollowingException
 import com.whattoeat.global.exception.FollowNotFoundException
 import com.whattoeat.global.exception.SelfFollowNotAllowedException
 import com.whattoeat.global.exception.UserNotFoundException
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -17,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional
 
 class FollowService(
     private val followRepository: FollowRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
     fun follow(followerId: Long, followingId: Long): Follow {
@@ -30,7 +33,9 @@ class FollowService(
             throw AlreadyFollowingException()
         }
 
-        return followRepository.save(Follow.of(follower, following))
+        val saved = followRepository.save(Follow.of(follower, following))
+        eventPublisher.publishEvent(FollowedEvent(followerId, followingId))
+        return saved
     }
 
     @Transactional
