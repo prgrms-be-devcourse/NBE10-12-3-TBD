@@ -940,8 +940,11 @@ function ListsPage() {
 
     setMyLists((prev) => prev.filter((list) => list.id !== listId));
 
+<<<<<<< HEAD
     await loadLists();
 
+=======
+>>>>>>> a2d4814 (fix: 맛집 리스트 삭제 기능 추가(#32))
     setSelectedId(null);
     setSelectedDetail(null);
 
