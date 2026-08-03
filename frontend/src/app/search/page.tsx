@@ -111,6 +111,51 @@ function mapKakaoPlaces(data: KakaoPlaceItem[]): KakaoRestaurant[] {
 }
 
 /**
+ * 특정 검색 의도에서 관련 없는 업종을 제거
+ *
+ * 일반 키워드는 카카오 검색 결과를 그대로 유지하고,
+ * 디저트 계열 검색일 때만 카페·베이커리 계열로 제한
+ */
+function filterPlacesByKeyword(
+  places: KakaoPlaceItem[],
+  keyword: string,
+): KakaoPlaceItem[] {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+
+  const dessertKeywords = [
+    "디저트",
+    "케이크",
+    "베이커리",
+    "빵",
+    "마카롱",
+    "도넛",
+  ];
+
+  const isDessertSearch = dessertKeywords.some((dessertKeyword) =>
+    normalizedKeyword.includes(dessertKeyword),
+  );
+
+  if (!isDessertSearch) {
+    return places;
+  }
+
+  return places.filter((place) => {
+    const placeText =
+      `${place.place_name} ${place.category_name}`.toLowerCase();
+
+    return (
+      place.category_name.startsWith("카페") ||
+      placeText.includes("베이커리") ||
+      placeText.includes("디저트") ||
+      placeText.includes("케이크") ||
+      placeText.includes("제과") ||
+      placeText.includes("도넛") ||
+      placeText.includes("마카롱")
+    );
+  });
+}
+
+/**
  * 음식점 결과 + 카페 결과 합치기
  *
  * 카카오 장소 ID 기준 중복 제거
@@ -245,8 +290,6 @@ function SearchPage() {
    */
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
 
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-
   /**
    * 사용자가 지도를 직접 움직였을 때
    * "이 지역 다시 검색" 버튼 표시 여부
@@ -295,15 +338,6 @@ function SearchPage() {
    * 카페 페이지네이션
    */
   const nearbyCafePaginationRef = useRef<KakaoPagination | null>(null);
-
-  /**
-   * 현재 위치 검색인지 여부
-   *
-   * 스크롤 시
-   * 어떤 nextPage()를 호출할지
-   * 구분하기 위해 사용
-   */
-  const isNearbySearchRef = useRef(false);
 
   /**
    * 현재 지도 전체 검색의 음식점 페이지네이션
@@ -375,7 +409,6 @@ function SearchPage() {
 
     pendingLoadMoreCountRef.current = 0;
     isLoadingMoreRef.current = false;
-    isNearbySearchRef.current = false;
 
     searchModeRef.current = null;
 
@@ -702,8 +735,6 @@ function SearchPage() {
       });
 
       markerElement.addEventListener("click", () => {
-        setSelectedPlaceId(restaurant.kakaoPlaceId);
-
         document
           .getElementById(`place-${restaurant.kakaoPlaceId}`)
           ?.scrollIntoView({
@@ -885,7 +916,7 @@ function SearchPage() {
         searchModeRef.current = "keyword";
       }
 
-      setLoading(true);
+      setLoading(!isLoadingMoreRef.current);
       setError("");
 
       const maps = window.kakao?.maps;
@@ -922,8 +953,12 @@ function SearchPage() {
             if (status === services.Status.OK) {
               paginationRef.current = pagination;
 
-              const foodAndCafe = data.filter(isFoodOrCafe);
-              const mappedResults = mapKakaoPlaces(foodAndCafe);
+              const filteredPlaces = filterPlacesByKeyword(
+                data.filter(isFoodOrCafe),
+                trimmedQuery,
+              );
+
+              const mappedResults = mapKakaoPlaces(filteredPlaces);
 
               /**
                * 현재 페이지에는 음식점·카페가 없지만
@@ -1166,7 +1201,6 @@ function SearchPage() {
      */
     resetPagination();
 
-    isNearbySearchRef.current = true;
     searchModeRef.current = "nearby";
 
     setLoading(true);
@@ -1656,8 +1690,12 @@ function SearchPage() {
           paginationRef.current = pagination;
 
           if (status === services.Status.OK) {
-            const foodAndCafe = data.filter(isFoodOrCafe);
-            const mappedResults = mapKakaoPlaces(foodAndCafe);
+            const filteredPlaces = filterPlacesByKeyword(
+              data.filter(isFoodOrCafe),
+              trimmedKeyword,
+            );
+
+            const mappedResults = mapKakaoPlaces(filteredPlaces);
 
             /**
              * 현재 페이지에는 음식점·카페가 없지만
@@ -2075,11 +2113,6 @@ function SearchPage() {
     }
   };
 
-  /**
-   * 화면에 표시할 결과
-   */
-  const filtered = results;
-
   return (
     <AppShell
       fullWidth
@@ -2168,7 +2201,6 @@ function SearchPage() {
                       setResults([]);
                       setError("");
                       setHoveredPlaceId(null);
-                      setSelectedPlaceId(null);
                       resetPagination();
                     }}
                     aria-label="검색어 지우기"
@@ -2222,14 +2254,14 @@ function SearchPage() {
                   <h2 className="text-base font-bold text-ink">검색 결과</h2>
 
                   <p className="mt-1 text-xs text-muted">
-                    {filtered[0]?.region2
-                      ? `${filtered[0].region2} 주변 장소`
+                    {results[0]?.region2
+                      ? `${results[0].region2} 주변 장소`
                       : "현재 지역에서 찾은 장소"}
                   </p>
                 </div>
 
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">
-                  {filtered.length}개
+                  {results.length}개
                 </span>
               </div>
             </div>
@@ -2240,7 +2272,7 @@ function SearchPage() {
               onScroll={handleResultScroll}
               className="min-h-0 flex-1 overflow-y-auto"
             >
-              {loading && filtered.length === 0 ? (
+              {loading && results.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-6">
                   <p className="text-sm text-muted">
                     검색 결과를 불러오는 중입니다.
@@ -2250,7 +2282,7 @@ function SearchPage() {
                 <div className="flex h-full items-center justify-center px-6">
                   <p className="text-center text-sm text-red-500">{error}</p>
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : results.length === 0 ? (
                 <div className="flex h-full items-center justify-center px-6">
                   <p className="text-center text-sm text-muted">
                     검색 결과가 없습니다.
@@ -2258,7 +2290,7 @@ function SearchPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-hairline-soft">
-                  {filtered.map((restaurant, index) => (
+                  {results.map((restaurant, index) => (
                     <button
                       id={`place-${restaurant.kakaoPlaceId}`}
                       key={restaurant.kakaoPlaceId}
