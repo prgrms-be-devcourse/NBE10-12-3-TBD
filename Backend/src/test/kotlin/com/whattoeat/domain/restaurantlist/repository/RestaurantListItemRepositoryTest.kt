@@ -114,13 +114,14 @@ class RestaurantListItemRepositoryTest {
 
     private fun createAndSaveRestaurantList(
         user: User,
-        title: String
+        title: String,
+        moodTag: MoodTag = MoodTag.DATE
     ): RestaurantList {
         val restaurantList = RestaurantList(
             user,
             title,
             "설명",
-            MoodTag.DATE
+            moodTag
         )
 
         return entityManager.persistAndFlush(restaurantList)
@@ -307,5 +308,44 @@ class RestaurantListItemRepositoryTest {
         )
 
         assertThat(item.createdAt).isNotNull()
+    }
+
+    @Test
+    fun `countMoodVotes는 지정 분위기의 리스트 등록 수를 집계한다`() {
+        val user = createAndSaveUser(
+            loginId = "mood-user",
+            nickname = "mood-nick",
+            email = "mood@test.com"
+        )
+        val restaurant = createAndSaveRestaurant("분위기 식당")
+        val firstDateList = createAndSaveRestaurantList(
+            user = user,
+            title = "데이트 리스트 1",
+            moodTag = MoodTag.DATE
+        )
+        val secondDateList = createAndSaveRestaurantList(
+            user = user,
+            title = "데이트 리스트 2",
+            moodTag = MoodTag.DATE
+        )
+        val soloList = createAndSaveRestaurantList(
+            user = user,
+            title = "혼밥 리스트",
+            moodTag = MoodTag.SOLO
+        )
+
+        createAndSaveItem(firstDateList,restaurant,"첫 번째",1)
+        createAndSaveItem(secondDateList,restaurant,"두 번째",1)
+        createAndSaveItem(soloList,restaurant,"혼밥",1)
+
+        val result = restaurantListItemRepository.countMoodVotes(
+            mood = MoodTag.DATE,
+            restaurantIds = listOf(restaurant.id!!)
+        )
+
+        assertThat(result).hasSize(1)
+        assertThat(result[0].restaurantId).isEqualTo(restaurant.id)
+        assertThat(result[0].voteCount).isEqualTo(2L)
+
     }
 }
