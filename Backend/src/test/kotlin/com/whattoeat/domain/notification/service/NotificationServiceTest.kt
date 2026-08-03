@@ -24,6 +24,7 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.test.util.ReflectionTestUtils
 import java.util.Optional
@@ -53,6 +54,12 @@ class NotificationServiceTest {
         val feed = Feed.builder().user(author).content("맛집이네요").build()
         ReflectionTestUtils.setField(feed, "id", id)
         return feed
+    }
+
+    private fun createNotification(id: Long, receiver: User, actor: User, feed: Feed?): Notification {
+        val notification = Notification.of(receiver, actor, feed, NotificationType.NEW_FEED, "$id")
+        ReflectionTestUtils.setField(notification, "id", id)
+        return notification
     }
 
     @Test
@@ -112,9 +119,7 @@ class NotificationServiceTest {
         val receiver = createUser(2L, "받는사람")
         val actor = createUser(1L, "작성자")
         val feed = createFeed(10L, actor)
-        val notification = Notification.of(
-            receiver, actor, feed, NotificationType.NEW_FEED, "작성자님이 새 글을 작성했습니다."
-        )
+        val notification = createNotification(100L, receiver, actor, feed)
 
         given(notificationRepository.findByIdAndReceiverId(100L, 2L)).willReturn(Optional.of(notification))
 
@@ -133,21 +138,82 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("알림 목록 조회")
-    fun getNotifications_success() {
+    @DisplayName("커서 조회 - size+1 조회되면 hasNext=true, nextCursor는 마지막 항목 id")
+    fun getNotificationsByCursor_hasNext_true() {
         val receiver = createUser(2L, "받는사람")
         val actor = createUser(1L, "작성자")
         val feed = createFeed(10L, actor)
-        val notification = Notification.of(
-            receiver, actor, feed, NotificationType.NEW_FEED, "작성자님이 새 글을 작성했습니다."
-        )
-        val pageable = Pageable.ofSize(20)
 
-        given(notificationRepository.findByReceiverIdOrderByIdDesc(2L, pageable))
-            .willReturn(PageImpl(listOf(notification), pageable, 1))
+        val n1 = createNotification(100L, receiver, actor, feed)
+        val n2 = createNotification(99L, receiver, actor, feed)
+        val n3 = createNotification(98L, receiver, actor, feed)
 
-        val result = notificationService.getNotifications(2L, pageable)
+        // size=2 요청 → 내부적으로 PageRequest.of(0, 3) 로 조회
+        given(notificationRepository.findByReceiverIdWithCursor(2L, null, PageRequest.of(0, 3)))
+            .willReturn(listOf(n1, n2, n3))
+
+        val result = notificationService.getNotificationsByCursor(2L, null, 2)
+
+        assertThat(result.content).hasSize(2)
+        assertThat(result.hasNext).isTrue
+        assertThat(result.nextCursor).isEqualTo(99L)
+    }
+
+    @Test
+    @DisplayName("커서 조회 - size 이하 조회되면 hasNext=false, nextCursor=null")
+    fun getNotificationsByCursor_hasNext_false() {
+        val receiver = createUser(2L, "받는사람")
+        val actor = createUser(1L, "작성자")
+        val feed = createFeed(10L, actor)
+        val n1 = createNotification(100L, receiver, actor, feed)
+
+        given(notificationRepository.findByReceiverIdWithCursor(2L, null, PageRequest.of(0, 21)))
+            .willReturn(listOf(n1))
+
+        val result = notificationService.getNotificationsByCursor(2L, null, 20)
 
         assertThat(result.content).hasSize(1)
+        assertThat(result.hasNext).isFalse
+        assertThat(result.nextCursor).isNull()
+    }
+
+    @Test
+    @DisplayName("커서 조회 - size는 1~50으로 clamp된다 (0→1, 999→50)")
+    fun getNotificationsByCursor_sizeClamp() {
+        // 0 → 1 로 clamp → PageRequest.of(0, 2)
+        given(notificationRepository.findByReceiverIdWithCursor(2L, null, PageRequest.of(0, 2)))
+            .willReturn(emptyList())
+        // 999 → 50 으로 clamp → PageRequest.of(0, 51)
+        given(notificationRepository.findByReceiverIdWithCursor(2L, null, PageRequest.of(0, 51)))
+            .willReturn(emptyList())
+
+        notificationService.getNotificationsByCursor(2L, null, 0)
+        notificationService.getNotificationsByCursor(2L, null, 999)
+
+        verify(notificationRepository).findByReceiverIdWithCursor(2L, null, PageRequest.of(0, 2))
+        verify(notificationRepository).findByReceiverIdWithCursor(2L, null, PageRequest.of(0, 51))
+    }
+
+    @Test
+    @DisplayName("커서 조회 - cursor 파라미터가 그대로 repository로 전달된다")
+    fun getNotificationsByCursor_cursorPassthrough() {
+        given(notificationRepository.findByReceiverIdWithCursor(2L, 50L, PageRequest.of(0, 21)))
+            .willReturn(emptyList())
+
+        val result = notificationService.getNotificationsByCursor(2L, 50L, 20)
+
+        assertThat(result.content).isEmpty()
+        assertThat(result.hasNext).isFalse
+        verify(notificationRepository).findByReceiverIdWithCursor(2L, 50L, PageRequest.of(0, 21))
+    }
+
+    @Test
+    @DisplayName("안 읽은 알림 개수를 반환한다")
+    fun getUnreadCount_returnsRepoCount() {
+        given(notificationRepository.countByReceiverIdAndIsReadFalse(2L)).willReturn(7L)
+
+        val count = notificationService.getUnreadCount(2L)
+
+        assertThat(count).isEqualTo(7L)
     }
 }

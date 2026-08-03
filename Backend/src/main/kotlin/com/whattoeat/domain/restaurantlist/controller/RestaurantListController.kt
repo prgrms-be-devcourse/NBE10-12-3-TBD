@@ -67,6 +67,25 @@ class RestaurantListController (
         )
     }
 
+    @GetMapping("/popular")
+    @Operation(summary = "가장 많이 저장된 맛집 리스트 조회")
+    fun getPopularRestaurantLists(
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        @RequestParam(defaultValue = "5") size: Int
+    ): RsData<RestaurantListResponse.PopularRestaurantListsResponse> {
+        val lists = restaurantListService.findPopularLists(
+            userDetails.userId,
+            size
+        )
+
+        return RsData.success(
+            RestaurantListResponse.PopularRestaurantListsResponse(
+                lists = lists
+            ),
+            "인기 맛집 리스트 조회가 완료되었습니다."
+        )
+    }
+
     // 맛집 리스트 단건 조회
     @GetMapping("/{id}")
     @Operation(summary = "맛집 리스트 단건 조회")
@@ -132,6 +151,16 @@ class RestaurantListController (
             RestaurantListResponse.RestaurantListDetail(restaurantList),
                 "리스트 정보가 변경되었습니다."
         )
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "맛집 리스트 삭제")
+    fun deleteRestaurantList(
+        @AuthenticationPrincipal userDetails: CustomUserDetails,
+        @PathVariable id: Long,
+    ): RsData<Void>{
+        restaurantListService.delete(id, userDetails.userId)
+        return RsData.success(null, "맛집 리스트가 삭제되었습니다.")
     }
 
 

@@ -6,10 +6,12 @@ import com.whattoeat.domain.comment.dto.CommentResponse.Companion.from
 import com.whattoeat.domain.comment.entity.Comment
 import com.whattoeat.domain.comment.repository.CommentRepository
 import com.whattoeat.domain.feed.repository.FeedRepository
+import com.whattoeat.domain.notification.event.CommentCreatedEvent
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.CommentNotFoundException
 import com.whattoeat.global.exception.FeedNotFoundException
 import com.whattoeat.global.exception.UserNotFoundException
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -19,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional
 class CommentService(
     private val commentRepository: CommentRepository,
     private val feedRepository: FeedRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     fun getComments(feedId: Long): List<CommentResponse> =
         commentRepository.findByFeedId(feedId).map(CommentResponse::from)
@@ -36,7 +39,9 @@ class CommentService(
             user = user,
             content = requireNotNull(request.content){"댓글 내용이 없습니다."}
         )
-        return from(commentRepository.save(comment))
+        val saved = commentRepository.save(comment)
+        eventPublisher.publishEvent(CommentCreatedEvent(feedId, saved.id!!, userId))
+        return from(saved)
     }
 
     @Transactional

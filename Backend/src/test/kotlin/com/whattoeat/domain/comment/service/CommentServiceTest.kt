@@ -23,6 +23,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.Mockito.never
 import org.mockito.junit.jupiter.MockitoExtension
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.test.util.ReflectionTestUtils
 import java.util.Optional
 
@@ -36,6 +37,9 @@ internal class CommentServiceTest {
 
     @Mock
     private lateinit var userRepository: UserRepository
+
+    @Mock
+    private lateinit var eventPublisher: ApplicationEventPublisher
 
     @InjectMocks
     private lateinit var commentService: CommentService
@@ -80,6 +84,7 @@ internal class CommentServiceTest {
         val feed = createFeed(user)
         val request = CommentRequest("새 댓글")
         val saved = Comment(feed = feed, user = user, content = "새 댓글")
+        ReflectionTestUtils.setField(saved, "id", 42L)
         given(feedRepository.findById(1L)).willReturn(Optional.of(feed))
         given(userRepository.findById(1L)).willReturn(Optional.of(user))
         given(commentRepository.save(ArgumentMatchers.any(Comment::class.java)))

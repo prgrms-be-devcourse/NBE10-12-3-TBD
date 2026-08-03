@@ -1,6 +1,7 @@
 package com.whattoeat.domain.notification.entity
 
 import com.whattoeat.domain.feed.entity.Feed
+import com.whattoeat.domain.restaurantlist.entity.RestaurantList
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.global.entity.BaseEntity
 import jakarta.persistence.Column
@@ -16,12 +17,17 @@ import jakarta.persistence.Table
 @Entity
 @Table(
     name = "notification",
-    indexes = [Index(name = "idx_notification_receiver_id", columnList = "receiver_id")]
+    indexes = [
+        Index(name = "idx_notification_receiver_id", columnList = "receiver_id"),
+        Index(name = "idx_notification_receiver_id_id", columnList = "receiver_id, id"),
+        Index(name = "idx_notification_dedup", columnList = "receiver_id, actor_id, type, feed_id"),
+    ]
 )
 class Notification private constructor(
     receiver: User,
     actor: User,
     feed: Feed?,
+    restaurantList: RestaurantList?,
     type: NotificationType,
     message: String
 ) : BaseEntity() {
@@ -39,6 +45,11 @@ class Notification private constructor(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "feed_id")
     var feed: Feed? = feed
+        protected set
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "restaurant_list_id")
+    var restaurantList: RestaurantList? = restaurantList
         protected set
 
     @Enumerated(EnumType.STRING)
@@ -61,6 +72,17 @@ class Notification private constructor(
     companion object {
         @JvmStatic
         fun of(receiver: User, actor: User, feed: Feed?, type: NotificationType, message: String): Notification =
-            Notification(receiver, actor, feed, type, message)
+            Notification(receiver, actor, feed, null, type, message)
+
+        @JvmStatic
+        fun of(
+            receiver: User,
+            actor: User,
+            feed: Feed?,
+            restaurantList: RestaurantList?,
+            type: NotificationType,
+            message: String
+        ): Notification =
+            Notification(receiver, actor, feed, restaurantList, type, message)
     }
 }

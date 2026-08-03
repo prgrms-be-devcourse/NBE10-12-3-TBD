@@ -257,6 +257,37 @@ class SavedRestaurantListRepositoryTest {
         }.isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
+    @Test
+    @DisplayName("리스트 ID로 저장 기록을 모두 삭제한다")
+    fun `deleteAllByRestaurantListId 저장 기록 전체 삭제`() {
+        val owner = userRepository.save(createUser("owner@test.com", "작성자"))
+        val user1 = userRepository.save(createUser("user1@test.com", "사용자1"))
+        val user2 = userRepository.save(createUser("user2@test.com", "사용자2"))
+
+        val restaurantList = restaurantListRepository
+            .save(createRestaurantList(owner, "혼밥 맛집", "혼자 먹기 좋은 곳"))
+
+        savedRestaurantListRepository.saveAllAndFlush(
+            listOf(
+                SavedRestaurantList(user1, restaurantList),
+                SavedRestaurantList(user2, restaurantList),
+            )
+        )
+
+        val deletedCount = savedRestaurantListRepository.deleteAllByRestaurantListId(restaurantList.id!!)
+        savedRestaurantListRepository.flush()
+
+        assertThat(deletedCount).isEqualTo(2L)
+        assertThat(
+            savedRestaurantListRepository.existsByUserIdAndRestaurantListId(
+                user1.id!!,
+                restaurantList.id!!
+            )
+        ).isFalse()
+
+        assertThat(restaurantListRepository.existsById(restaurantList.id!!)).isTrue()
+    }
+
     private fun createUser(
         email: String,
         nickname: String

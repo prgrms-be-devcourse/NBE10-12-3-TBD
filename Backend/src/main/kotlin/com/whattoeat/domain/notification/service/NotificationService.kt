@@ -2,11 +2,13 @@ package com.whattoeat.domain.notification.service
 
 import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.follow.repository.FollowRepository
+import com.whattoeat.domain.notification.dto.NotificationCursorResponse
+import com.whattoeat.domain.notification.dto.NotificationResponse
 import com.whattoeat.domain.notification.entity.Notification
 import com.whattoeat.domain.notification.entity.NotificationType
 import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.global.exception.NotificationNotFoundException
-import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -41,8 +43,21 @@ class NotificationService(
     }
 
     @Transactional(readOnly = true)
-    fun getNotifications(userId: Long, pageable: Pageable): Page<Notification> =
-        notificationRepository.findByReceiverIdOrderByIdDesc(userId, pageable)
+    fun getNotificationsByCursor(userId: Long, cursor: Long?, size: Int): NotificationCursorResponse {
+        val safeSize = size.coerceIn(1, 50)
+        val page = PageRequest.of(0, safeSize + 1)
+        val rows = notificationRepository.findByReceiverIdWithCursor(userId, cursor, page)
+
+        val hasNext = rows.size > safeSize
+        val content = rows.take(safeSize).map(::NotificationResponse)
+        val nextCursor = if (hasNext) content.last().id else null
+
+        return NotificationCursorResponse(content, nextCursor, hasNext)
+    }
+
+    @Transactional(readOnly = true)
+    fun getUnreadCount(userId: Long): Long =
+        notificationRepository.countByReceiverIdAndIsReadFalse(userId)
 
     @Transactional
     fun markAsRead(userId: Long, notificationId: Long): Notification {

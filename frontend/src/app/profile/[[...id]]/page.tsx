@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Settings, Users, UserPlus, X, UserMinus } from "lucide-react";
+import {
+  Settings,
+  Users,
+  UserPlus,
+  X,
+  UserMinus,
+  MoreHorizontal,
+} from "lucide-react";
 
 import AppShell from "@/components/AppShell";
 import { apiFetchJson, getImageUrl } from "@/lib/api";
 import { getStoredUser } from "@/lib/user";
 
-const tabs = ["내 리스트", "포스트", "저장함"];
+const tabs = ["내 리스트", "포스트", "저장함"] as const;
+type ProfileTab = (typeof tabs)[number];
 
 /* =========================================================
  * 사용자 프로필
@@ -72,6 +80,8 @@ interface FeedListPageResponse {
     imageUrl?: string | null;
     likeCount: number;
     createdAt: string;
+    restaurantId?: number | null;
+    restaurantName?: string | null;
   }[];
 }
 
@@ -117,9 +127,27 @@ export default function ProfilePage() {
    * 탭
    * --------------------------------------------------------- */
 
-  const [activeTab, setActiveTab] = useState("내 리스트");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("내 리스트");
 
   const [tabLoading, setTabLoading] = useState(false);
+
+  useEffect(() => {
+    const syncTabFromUrl = () => {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      const nextTab: ProfileTab = tabs.includes(tab as ProfileTab)
+        ? (tab as ProfileTab)
+        : "내 리스트";
+
+      setActiveTab((current) => (current === nextTab ? current : nextTab));
+    };
+
+    syncTabFromUrl();
+    window.addEventListener("popstate", syncTabFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncTabFromUrl);
+    };
+  }, []);
 
   /* ---------------------------------------------------------
    * 팔로우
@@ -136,6 +164,8 @@ export default function ProfilePage() {
   const [followerCount, setFollowerCount] = useState<number | null>(null);
 
   const [followingCount, setFollowingCount] = useState<number | null>(null);
+
+  const [openMenuFeedId, setOpenMenuFeedId] = useState<number | null>(null);
 
   /* ---------------------------------------------------------
    * 탭 데이터
@@ -256,8 +286,7 @@ export default function ProfilePage() {
               setListTotalPages(0);
             }
           } else {
-
-          /* 다른 사람 프로필 */
+            /* 다른 사람 프로필 */
             const res = await apiFetchJson<ProfileListsResponse>(
               "/api/v1/lists/all?page=0&size=10",
             );
@@ -285,10 +314,9 @@ export default function ProfilePage() {
             }
           }
         } else if (activeTab === "포스트") {
-
-        /* =====================================================
-         * 포스트
-         * ===================================================== */
+          /* =====================================================
+           * 포스트
+           * ===================================================== */
           const res = await apiFetchJson<FeedListPageResponse>(
             `/api/v1/feeds?userId=${targetUserId}`,
           );
@@ -303,10 +331,9 @@ export default function ProfilePage() {
             setMyPosts([]);
           }
         } else if (activeTab === "저장함" && user.isOwnProfile) {
-
-        /* =====================================================
-         * 저장함
-         * ===================================================== */
+          /* =====================================================
+           * 저장함
+           * ===================================================== */
           const res = await apiFetchJson<{
             content: SavedList[];
           }>("/api/v1/restaurant_lists/saved");
@@ -448,6 +475,52 @@ export default function ProfilePage() {
       alert("다음 리스트를 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoadingMoreLists(false);
+    }
+  };
+
+  const handleEditFeed = (post: FeedListPageResponse["feeds"][number]) => {
+    sessionStorage.setItem(
+      "editingFeed",
+      JSON.stringify({
+        feedId: post.feedId,
+        content: post.content,
+        restaurantId: post.restaurantId,
+        restaurantName: post.restaurantName,
+        imageUrl: post.imageUrl,
+        returnUrl: `${window.location.pathname}${window.location.search}`,
+      }),
+    );
+    setOpenMenuFeedId(null);
+    router.push(`/feed/write?edit=${post.feedId}`);
+  };
+
+  const handleTabChange = (tab: ProfileTab) => {
+    setActiveTab(tab);
+
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", tab);
+
+    router.replace(`${window.location.pathname}?${params.toString()}`, {
+      scroll: false,
+    });
+  };
+
+  const handleDeleteFeed = async (feedId: number) => {
+    const confirmed = window.confirm("피드를 삭제하시겠습니까?");
+    if (!confirmed) return;
+
+    const res = await apiFetchJson(`/api/v1/feeds/${feedId}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      setMyPosts((prev) => prev.filter((post) => post.feedId !== feedId));
+
+      setOpenMenuFeedId(null);
+
+      window.dispatchEvent(new Event("feed-state-change"));
+    } else {
+      alert(res.message || "피드 삭제에 실패했습니다.");
     }
   };
 
@@ -651,7 +724,7 @@ export default function ProfilePage() {
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`relative px-4 py-3 text-sm font-bold transition-colors ${
                 activeTab === tab ? "text-primary" : "text-muted hover:text-ink"
               }`}
@@ -759,6 +832,52 @@ export default function ProfilePage() {
                           onClick={() => router.push("/feed")}
                           className="rounded-2xl border border-hairline-soft bg-surface p-5 cursor-pointer hover:border-primary/30 transition-colors"
                         >
+                          <div className="flex justify-end">
+                            {user.isOwnProfile && (
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuFeedId((prev) =>
+                                      prev === post.feedId ? null : post.feedId,
+                                    );
+                                  }}
+                                  className="rounded-full p-1.5 text-muted hover:bg-surface-soft"
+                                  aria-label="피드 메뉴"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </button>
+
+                                {openMenuFeedId === post.feedId && (
+                                  <div className="absolute right-0 top-8 z-20 w-28 overflow-hidden rounded-lg border border-hairline-soft bg-surface shadow-lg">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditFeed(post);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-surface-soft"
+                                    >
+                                      수정
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteFeed(post.feedId);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-500 hover:bg-surface-soft"
+                                    >
+                                      삭제
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
                           <p className="text-sm leading-6 text-body">
                             {post.content}
                           </p>
@@ -1076,7 +1195,10 @@ function FollowListModal({
                   className="flex items-center gap-3"
                 >
                   <img
-                    src={getImageUrl(followUser.profileImage) ?? "/default-profile.png"}
+                    src={
+                      getImageUrl(followUser.profileImage) ??
+                      "/default-profile.png"
+                    }
                     alt={followUser.nickname}
                     className="h-9 w-9 rounded-full object-cover"
                   />

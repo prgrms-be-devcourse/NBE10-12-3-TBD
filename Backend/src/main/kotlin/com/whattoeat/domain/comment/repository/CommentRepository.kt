@@ -11,6 +11,8 @@ interface CommentRepository : JpaRepository<Comment, Long> {
     // FeedListResponse에 댓글 수 넣기 위한 카운트 쿼리 추가
     fun countByFeedId(feedId: Long): Long
 
+    fun deleteAllByFeed_Id(feedId: Long)
+
     @Query("SELECT c.feed.id, COUNT(c) FROM Comment c WHERE c.feed.id IN :feedIds GROUP BY c.feed.id")
     fun countByFeedIds(@Param("feedIds") feedIds: List<Long>): List<Array<Any>>
 }

@@ -32,21 +32,35 @@ declare global {
   }
 
   interface KakaoPagination {
+    current: number;
+    last: number;
+    perPage: number;
+    totalCount: number;
     hasNextPage: boolean;
-    currentPage: number;
+    hasPrevPage: boolean;
     nextPage: () => void;
+    prevPage: () => void;
+    gotoPage: (page: number) => void;
   }
 
   interface KakaoPlaces {
     keywordSearch: (
       query: string,
-      callback: (data: KakaoPlaceItem[], status: string, pagination: KakaoPagination) => void,
+      callback: (
+        data: KakaoPlaceItem[],
+        status: string,
+        pagination: KakaoPagination,
+      ) => void,
       options?: object,
     ) => void;
 
     categorySearch: (
       categoryCode: string,
-      callback: (data: KakaoPlaceItem[], status: string, pagination: KakaoPagination) => void,
+      callback: (
+        data: KakaoPlaceItem[],
+        status: string,
+        pagination: KakaoPagination,
+      ) => void,
       options?: object,
     ) => void;
   }

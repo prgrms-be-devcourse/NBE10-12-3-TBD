@@ -344,7 +344,7 @@ export default function RecommendPage() {
                 };
               }),
             );
-            if (pagination.hasNextPage && pagination.currentPage < 3) {
+            if (pagination.hasNextPage && pagination.current < 3) {
               pagination.nextPage();
             } else {
               resolve(all);
