@@ -258,6 +258,31 @@ function ListsPage() {
   };
 
   /* =========================================================
+   * 인기 리스트만 불러오기
+   * ========================================================= */
+
+  const loadPopularLists = async () => {
+    try {
+      const res = await apiFetchJson<PopularRestaurantListsResponse>(
+        "/api/v1/lists/popular?size=5",
+      );
+
+      if (res.ok && res.data) {
+        setPopularLists(res.data.lists);
+        setPopularError("");
+      } else {
+        setPopularLists([]);
+        setPopularError(res.message || "인기 리스트를 불러오지 못했습니다.");
+      }
+    } catch (error) {
+      console.error("인기 리스트 조회 실패:", error);
+
+      setPopularLists([]);
+      setPopularError("인기 리스트를 불러오는 중 오류가 발생했습니다.");
+    }
+  };
+
+  /* =========================================================
    * 리스트 목록 불러오기
    * ========================================================= */
 
@@ -915,6 +940,8 @@ function ListsPage() {
 
     setMyLists((prev) => prev.filter((list) => list.id !== listId));
 
+    await loadLists();
+
     setSelectedId(null);
     setSelectedDetail(null);
 
@@ -983,6 +1010,8 @@ function ListsPage() {
         return [savedList, ...prev];
       });
 
+      await loadPopularLists();
+
       showAlert("리스트를 저장했습니다.");
     } catch (error) {
       console.error("리스트 저장 오류:", error);
@@ -1039,6 +1068,8 @@ function ListsPage() {
       setSavedLists((prev) =>
         prev.filter((savedList) => savedList.listId !== currentListId),
       );
+
+      await loadPopularLists();
 
       if (activeTab === "saved") {
         setSelectedId(null);
