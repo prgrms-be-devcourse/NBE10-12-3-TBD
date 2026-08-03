@@ -105,10 +105,14 @@ class NotificationWorker(
     }
 
     private fun reclaimStaleMessages() {
-        val summary = try {
+        // 재시작마다 consumerName의 UUID가 바뀌므로 자기 pending만 조회하면
+        // 이전 워커가 남긴 pending을 못 봐서 유실된다.
+        // → 컨슈머 그룹 전체 pending을 조회하고, idle time(30s) 넘은 메시지를
+        //   현재 consumer로 XCLAIM 해서 재처리한다.
+        val pendingMessages = try {
             redisTemplate.opsForStream<Any, Any>().pending(
                 STREAM_KEY,
-                Consumer.from(CONSUMER_GROUP, consumerName),
+                CONSUMER_GROUP,
                 Range.unbounded<String>(),
                 10L
             )
@@ -116,7 +120,7 @@ class NotificationWorker(
             return
         } ?: return
 
-        summary.forEach { pm ->
+        pendingMessages.forEach { pm ->
             val idStr = pm.idAsString
             val deliveryCount = pm.totalDeliveryCount
 
@@ -128,6 +132,7 @@ class NotificationWorker(
                 }
                 log.error("알림 처리 재시도 초과 → DLQ recordId={} deliveryCount={}", idStr, deliveryCount)
             } else {
+                // XCLAIM의 min-idle-time(30초)로 필터 → 방금 다른 워커가 잡은 신선한 메시지는 스킵
                 val claimed = redisTemplate.opsForStream<Any, Any>().claim(
                     STREAM_KEY, CONSUMER_GROUP, consumerName,
                     Duration.ofSeconds(30),
