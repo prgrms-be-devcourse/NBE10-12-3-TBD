@@ -1,4 +1,6 @@
-package com.whattoeat.domain.restaurant.entity
+package com.whattoeat.domain.restaurant.mapper
+
+import com.whattoeat.domain.restaurant.entity.Category
 
 private val TOKEN_TO_CATEGORY: Map<String, Category> = mapOf(
     "한식" to Category.KOREAN,
@@ -32,5 +34,23 @@ fun toCategory(categoryName: String?): Category {
 }
 
 fun categoryLabel(categoryName: String?): String {
-    return extractToken(categoryName) ?: "기타"
+    val parts = categoryName.orEmpty()
+        .split(">")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+    if (parts.isEmpty()) return "기타"
+
+    return when {
+        parts[0] == "카페" ->
+            parts.getOrNull(1) ?: "카페"
+
+        parts[0] == "음식점" && parts.getOrNull(1) == "카페" ->
+            parts.getOrNull(2) ?: "카페"
+
+        parts[0] == "음식점" ->
+            parts.getOrNull(1) ?: "기타"
+
+        else -> parts[0]
+    }
 }

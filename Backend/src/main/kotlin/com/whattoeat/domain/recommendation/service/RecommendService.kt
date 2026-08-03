@@ -5,8 +5,8 @@ import com.whattoeat.domain.recommendation.dto.RecommendRequest
 import com.whattoeat.domain.recommendation.dto.RecommendSort
 import com.whattoeat.domain.restaurant.dto.RestaurantRequest
 import com.whattoeat.domain.restaurant.entity.Category
-import com.whattoeat.domain.restaurant.entity.categoryLabel
-import com.whattoeat.domain.restaurant.entity.toCategory
+import com.whattoeat.domain.restaurant.mapper.categoryLabel
+import com.whattoeat.domain.restaurant.mapper.toCategory
 import com.whattoeat.global.exception.InvalidRecommendParameterException
 import com.whattoeat.global.exception.RestaurantNotFoundException
 import org.springframework.stereotype.Service
