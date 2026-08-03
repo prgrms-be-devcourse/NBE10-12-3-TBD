@@ -13,6 +13,8 @@ interface FeedLikeRepository : JpaRepository<FeedLike, Long> {
 
     fun deleteByFeed_IdAndUser_Id(feedId: Long, userId: Long)
 
+    fun deleteAllByFeed_Id(feedId: Long)
+
     @Query(
         """
         select fl.feed.id

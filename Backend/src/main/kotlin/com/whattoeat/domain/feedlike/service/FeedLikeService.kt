@@ -5,12 +5,14 @@ import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.feedlike.dto.FeedLikeResponse
 import com.whattoeat.domain.feedlike.entity.FeedLike
 import com.whattoeat.domain.feedlike.repository.FeedLikeRepository
+import com.whattoeat.domain.notification.event.FeedLikedEvent
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.AlreadyLikedFeedException
 import com.whattoeat.global.exception.FeedLikeNotFoundException
 import com.whattoeat.global.exception.FeedNotFoundException
 import com.whattoeat.global.exception.UserNotFoundException
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -19,6 +21,7 @@ class FeedLikeService(
     private val feedLikeRepository: FeedLikeRepository,
     private val userRepository: UserRepository,
     private val feedRepository: FeedRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
     fun like(userId: Long, feedId: Long): FeedLikeResponse {
@@ -32,6 +35,8 @@ class FeedLikeService(
         feedLikeRepository.save(FeedLike.of(feed, user))
 
         feed.increaseLikeCount()
+
+        eventPublisher.publishEvent(FeedLikedEvent(feed.id!!, userId))
 
         return FeedLikeResponse.of(feed.id, feed.likeCount, true)
     }

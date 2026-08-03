@@ -11,6 +11,7 @@ import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.feedlike.repository.FeedLikeRepository
 import com.whattoeat.domain.follow.entity.Follow
 import com.whattoeat.domain.follow.repository.FollowRepository
+import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.domain.user.entity.Provider
 import com.whattoeat.domain.user.entity.User
@@ -26,6 +27,9 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.BDDMockito.given
+import org.mockito.Mockito.inOrder
+import org.mockito.Mockito.never
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -61,6 +65,9 @@ class FeedServiceTest {
 
     @MockitoBean
     private lateinit var feedLikeRepository: FeedLikeRepository
+
+    @MockitoBean
+    private lateinit var notificationRepository: NotificationRepository
 
     @Autowired
     private lateinit var feedService: FeedService
@@ -197,6 +204,10 @@ class FeedServiceTest {
         assertThatThrownBy { feedService.updateFeed(1L, 2L, request, image) }
             .isInstanceOf(AccessDeniedException::class.java)
             .hasMessageContaining("본인 피드만 수정할 수 있습니다.")
+
+        assertThat(feed.content).isEqualTo("원본 내용")
+        assertThat(feed.user.id).isEqualTo(owner.id)
+        verify(feedRepository, never()).save(feed)
     }
 
     @Test
@@ -253,6 +264,13 @@ class FeedServiceTest {
         assertThatThrownBy { feedService.deleteFeed(1L, 2L) }
             .isInstanceOf(AccessDeniedException::class.java)
             .hasMessageContaining("본인 피드만 삭제할 수 있습니다.")
+
+        assertThat(feed.content).isEqualTo("맛집이네요")
+        assertThat(feed.user.id).isEqualTo(owner.id)
+        verify(notificationRepository, never()).clearFeedReference(1L)
+        verify(feedLikeRepository, never()).deleteAllByFeed_Id(1L)
+        verify(commentRepository, never()).deleteAllByFeed_Id(1L)
+        verify(feedRepository, never()).delete(feed)
     }
 
     @Test
@@ -270,8 +288,20 @@ class FeedServiceTest {
         val user = createTestUser(1L, "testUser")
         val feed = Feed.builder().user(user).content("맛집이네요").build()
         given(feedRepository.findById(1L)).willReturn(Optional.of(feed))
+
         feedService.deleteFeed(1L, 1L)
-        verify(feedRepository).delete(feed)
+
+        val inOrder =
+            inOrder(
+                notificationRepository,
+                feedLikeRepository,
+                commentRepository,
+                feedRepository,
+            )
+        inOrder.verify(notificationRepository, times(1)).clearFeedReference(1L)
+        inOrder.verify(feedLikeRepository, times(1)).deleteAllByFeed_Id(1L)
+        inOrder.verify(commentRepository, times(1)).deleteAllByFeed_Id(1L)
+        inOrder.verify(feedRepository, times(1)).delete(feed)
     }
 
     @Test

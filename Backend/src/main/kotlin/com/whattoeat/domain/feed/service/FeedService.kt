@@ -10,6 +10,7 @@ import com.whattoeat.domain.feed.event.FeedCreatedEvent
 import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.feedlike.repository.FeedLikeRepository
 import com.whattoeat.domain.follow.repository.FollowRepository
+import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.global.exception.FeedNotFoundException
@@ -36,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile
     private val commentRepository: CommentRepository,
     private val feedLikeRepository: FeedLikeRepository,
     private val imageUploadService: ImageUploadService,
+     private val notificationRepository: NotificationRepository,
 ) {
     companion object {
         // 추천 후보로 가져올 최신 피드 최대 개수 (전체 스캔 방지용 상한)
@@ -290,6 +292,13 @@ import org.springframework.web.multipart.MultipartFile
             throw AccessDeniedException("본인 피드만 삭제할 수 있습니다.")
         }
 
+        notificationRepository.clearFeedReference(feedId)
+
+        feedLikeRepository.deleteAllByFeed_Id(feedId)
+
+        commentRepository.deleteAllByFeed_Id(feedId)
+
         feedRepository.delete(feed)
+
     }
 }

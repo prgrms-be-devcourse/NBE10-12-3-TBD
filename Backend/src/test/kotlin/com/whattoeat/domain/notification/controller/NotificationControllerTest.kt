@@ -1,6 +1,8 @@
 package com.whattoeat.domain.notification.controller
 
 import com.whattoeat.domain.feed.entity.Feed
+import com.whattoeat.domain.notification.dto.NotificationCursorResponse
+import com.whattoeat.domain.notification.dto.NotificationResponse
 import com.whattoeat.domain.notification.entity.Notification
 import com.whattoeat.domain.notification.entity.NotificationType
 import com.whattoeat.domain.notification.service.NotificationService
@@ -20,8 +22,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.core.MethodParameter
-import org.springframework.data.domain.PageImpl
-import org.springframework.data.domain.PageRequest
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -95,30 +95,53 @@ class NotificationControllerTest {
     }
 
     @Test
-    fun 알림_목록_조회_성공() {
+    fun 알림_목록_커서_조회_성공() {
         val receiver = createUser(1L, "받는사람")
         val actor = createUser(2L, "작성자")
         val feed = Feed.builder().user(actor).content("맛집").build()
         ReflectionTestUtils.setField(feed, "id", 10L)
 
         val notification = createNotification(100L, receiver, actor, feed)
-        val pageable = PageRequest.of(0, 20)
+        val response = NotificationCursorResponse(
+            content = listOf(NotificationResponse(notification)),
+            nextCursor = 99L,
+            hasNext = true
+        )
 
-        // Kotlin으로 컴파일된 NotificationService의 non-null Pageable 파라미터에
-        // eq()를 쓰면 Mockito가 내부적으로 null을 반환해 Kotlin의 null 체크에 걸리므로
-        // 굳이 matcher가 필요 없는 이 값들은 그냥 실제 값으로 비교한다.
-        given(notificationService.getNotifications(1L, pageable))
-            .willReturn(PageImpl(listOf(notification), pageable, 1))
+        given(notificationService.getNotificationsByCursor(1L, null, 20)).willReturn(response)
 
         mockMvc.perform(get("/api/v1/notifications").with(userDetails(1L)))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data[0].id").value(100))
-            .andExpect(jsonPath("$.data[0].actorId").value(2))
-            .andExpect(jsonPath("$.data[0].actorNickname").value("작성자"))
-            .andExpect(jsonPath("$.data[0].feedId").value(10))
-            .andExpect(jsonPath("$.data[0].type").value("NEW_FEED"))
-            .andExpect(jsonPath("$.data[0].isRead").value(false))
+            .andExpect(jsonPath("$.data.content[0].id").value(100))
+            .andExpect(jsonPath("$.data.content[0].actorId").value(2))
+            .andExpect(jsonPath("$.data.content[0].actorNickname").value("작성자"))
+            .andExpect(jsonPath("$.data.content[0].feedId").value(10))
+            .andExpect(jsonPath("$.data.content[0].restaurantListId").doesNotExist())
+            .andExpect(jsonPath("$.data.content[0].type").value("NEW_FEED"))
+            .andExpect(jsonPath("$.data.content[0].isRead").value(false))
+            .andExpect(jsonPath("$.data.nextCursor").value(99))
+            .andExpect(jsonPath("$.data.hasNext").value(true))
+    }
+
+    @Test
+    fun 알림_목록_커서_파라미터_전달() {
+        val response = NotificationCursorResponse(emptyList(), null, false)
+        given(notificationService.getNotificationsByCursor(1L, 50L, 10)).willReturn(response)
+
+        mockMvc.perform(get("/api/v1/notifications?cursor=50&size=10").with(userDetails(1L)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.hasNext").value(false))
+    }
+
+    @Test
+    fun 안읽은_알림_개수_조회() {
+        given(notificationService.getUnreadCount(1L)).willReturn(7L)
+
+        mockMvc.perform(get("/api/v1/notifications/unread-count").with(userDetails(1L)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.count").value(7))
     }
 
     @Test

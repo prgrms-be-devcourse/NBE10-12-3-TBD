@@ -31,16 +31,36 @@ declare global {
     x: string;
   }
 
+  interface KakaoPagination {
+    current: number;
+    last: number;
+    perPage: number;
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+    nextPage: () => void;
+    prevPage: () => void;
+    gotoPage: (page: number) => void;
+  }
+
   interface KakaoPlaces {
     keywordSearch: (
       query: string,
-      callback: (data: KakaoPlaceItem[], status: string) => void,
+      callback: (
+        data: KakaoPlaceItem[],
+        status: string,
+        pagination: KakaoPagination,
+      ) => void,
       options?: object,
     ) => void;
 
     categorySearch: (
       categoryCode: string,
-      callback: (data: KakaoPlaceItem[], status: string) => void,
+      callback: (
+        data: KakaoPlaceItem[],
+        status: string,
+        pagination: KakaoPagination,
+      ) => void,
       options?: object,
     ) => void;
   }

@@ -24,6 +24,7 @@ import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.Mockito.mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import java.util.Optional
@@ -39,6 +40,9 @@ class SavedRestaurantListServiceTest {
 
     @Mock
     lateinit var userRepository: UserRepository
+
+    @Mock
+    lateinit var eventPublisher: ApplicationEventPublisher
 
     @InjectMocks
     lateinit var savedRestaurantListService: SavedRestaurantListService

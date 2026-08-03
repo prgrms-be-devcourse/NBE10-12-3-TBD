@@ -1,5 +1,6 @@
 package com.whattoeat.domain.restaurantlist.service
 
+import com.whattoeat.domain.notification.event.RestaurantListSavedEvent
 import com.whattoeat.domain.restaurantlist.dto.SavedRestaurantListResponse
 import com.whattoeat.domain.restaurantlist.entity.SavedRestaurantList
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListRepository
@@ -8,6 +9,7 @@ import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.AlreadySavedRestaurantListException
 import com.whattoeat.global.exception.ListNotFoundException
 import com.whattoeat.global.exception.UserNotFoundException
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -18,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional
 class SavedRestaurantListService(
     private val userRepository: UserRepository,
     private val restaurantListRepository: RestaurantListRepository,
-    private val savedRestaurantListRepository: SavedRestaurantListRepository
+    private val savedRestaurantListRepository: SavedRestaurantListRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     // 레스토랑 리스트 저장(연결)
     fun save(userId: Long, restaurantListId: Long) {
@@ -42,6 +45,8 @@ class SavedRestaurantListService(
 
         // 저장 기록 DB에 저장
         savedRestaurantListRepository.save(savedRestaurantList)
+
+        eventPublisher.publishEvent(RestaurantListSavedEvent(restaurantListId, userId))
     }
 
 
