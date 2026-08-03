@@ -1,12 +1,14 @@
 package com.whattoeat.domain.notification.repository
 
 import com.whattoeat.domain.notification.entity.Notification
+import com.whattoeat.domain.notification.entity.NotificationType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import java.util.Optional
 
 interface NotificationRepository : JpaRepository<Notification, Long> {
@@ -16,8 +18,6 @@ interface NotificationRepository : JpaRepository<Notification, Long> {
 
     fun findByIdAndReceiverId(id: Long, receiverId: Long): Optional<Notification>
 
-    // Kotlin에서는 boolean 필드명이 "isRead"로 유지되므로(자바의 read 필드 + isRead() 게터와 달리)
-    // 파생 쿼리 메서드명도 프로퍼티명(isRead)에 맞춰야 한다.
     fun countByReceiverIdAndIsReadFalse(receiverId: Long): Long
 
     @Modifying
@@ -27,4 +27,39 @@ interface NotificationRepository : JpaRepository<Notification, Long> {
     where n.feed.id = :feedId
 """)
     fun clearFeedReference(feedId: Long)
+
+    @EntityGraph(attributePaths = ["actor", "feed", "restaurantList"])
+    @Query(
+        """
+        SELECT n FROM Notification n
+        WHERE n.receiver.id = :receiverId
+          AND (:cursor IS NULL OR n.id < :cursor)
+        ORDER BY n.id DESC
+        """
+    )
+    fun findByReceiverIdWithCursor(
+        @Param("receiverId") receiverId: Long,
+        @Param("cursor") cursor: Long?,
+        pageable: Pageable
+    ): List<Notification>
+
+    fun existsByReceiverIdAndActorIdAndFeedIdAndType(
+        receiverId: Long,
+        actorId: Long,
+        feedId: Long,
+        type: NotificationType
+    ): Boolean
+
+    fun existsByReceiverIdAndActorIdAndTypeAndFeedIsNullAndRestaurantListIsNull(
+        receiverId: Long,
+        actorId: Long,
+        type: NotificationType
+    ): Boolean
+
+    fun existsByReceiverIdAndActorIdAndRestaurantListIdAndType(
+        receiverId: Long,
+        actorId: Long,
+        restaurantListId: Long,
+        type: NotificationType
+    ): Boolean
 }
