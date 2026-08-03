@@ -1,11 +1,13 @@
 package com.whattoeat.domain.recommendation.service
 
 import com.whattoeat.domain.feed.repository.FeedRepository
+import com.whattoeat.domain.feed.repository.MoodVoteCount
 import com.whattoeat.domain.recommendation.dto.RecommendRequest
 import com.whattoeat.domain.recommendation.dto.RecommendSort
 import com.whattoeat.domain.restaurant.dto.RestaurantRequest
 import com.whattoeat.domain.restaurant.entity.Category
 import com.whattoeat.domain.restaurant.entity.MoodTag
+import com.whattoeat.domain.restaurant.entity.Restaurant
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListItemRepository
 import com.whattoeat.global.exception.InvalidRecommendParameterException
@@ -15,9 +17,11 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.BDDMockito.given
+import org.mockito.BDDMockito.then
 import org.mockito.InjectMocks
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
+import org.springframework.test.util.ReflectionTestUtils
 
 @ExtendWith(MockitoExtension::class)
 class RecommendationServiceTest {
@@ -53,6 +57,38 @@ class RecommendationServiceTest {
         lat = lat,
         lng = lng
     )
+
+    private fun storedRestaurant(
+        id: Long,
+        kakaoPlaceId: String
+    ): Restaurant {
+        val restaurant = Restaurant(
+            kakaoPlaceId = kakaoPlaceId,
+            name = "저장된 식당$kakaoPlaceId",
+            category = Category.KOREAN,
+            address = "수원시 팔달구",
+            roadAddress = null,
+            region1 = "경기",
+            region2 = "수원시",
+            region3 = null,
+            region4 = null,
+            phone = null,
+            lat = 37.5,
+            lng = 127.0
+        )
+
+        ReflectionTestUtils.setField(restaurant, "id", id)
+
+        return restaurant
+    }
+
+    private fun voteCount(
+        id: Long,
+        count: Long
+    ): MoodVoteCount = object : MoodVoteCount {
+        override val restaurantId: Long = id
+        override val voteCount: Long = count
+    }
 
     private fun request(
         candidates: List<RestaurantRequest.FromKakao>,
@@ -183,8 +219,10 @@ class RecommendationServiceTest {
             candidate("2", "카페 > 커피전문점")
         )
 
-        given(restaurantRepository
-            .findByKakaoPlaceIdIn(listOf("1", "2"))).willReturn(emptyList())
+        given(
+            restaurantRepository
+                .findByKakaoPlaceIdIn(listOf("1", "2"))
+        ).willReturn(emptyList())
         val result = recommendService.recommend(
             request(candidates = candidates, mood = MoodTag.DATE)
         )
@@ -199,12 +237,45 @@ class RecommendationServiceTest {
             candidate("2", "음식점 > 아시아음식")
         )
 
-        given(restaurantRepository
-            .findByKakaoPlaceIdIn(listOf("1", "2"))).willReturn(emptyList())
+        given(
+            restaurantRepository
+                .findByKakaoPlaceIdIn(listOf("1", "2"))
+        ).willReturn(emptyList())
         val result = recommendService.recommend(
             request(candidates = candidates, mood = MoodTag.DATE)
         )
 
         assertThat(result.map { it.kakaoPlaceId }).containsExactlyInAnyOrder("1", "2")
+    }
+
+    @Test
+    fun `피드와 리스트의 mood 투표 후보를 모두 추천에 반영한다`() {
+        val candidates = listOf(
+            candidate("1", "음식점 > 한식"),
+            candidate("2", "음식점 > 중식"),
+            candidate("3", "음식점 > 한식")
+        )
+
+        val restaurantIds = listOf(1L, 2L, 3L)
+        given(restaurantRepository.findByKakaoPlaceIdIn(listOf("1", "2", "3")))
+            .willReturn(
+                listOf(
+                    storedRestaurant(1L, "1"),
+                    storedRestaurant(2L, "2"),
+                    storedRestaurant(3L, "3")
+                )
+            )
+
+        given(feedRepository.countMoodVotes(MoodTag.DATE, restaurantIds))
+            .willReturn(listOf(voteCount(1L, 2L)))
+        given(restaurantListItemRepository.countMoodVotes(MoodTag.DATE, restaurantIds))
+            .willReturn(listOf(voteCount(2L, 3L)))
+        val result = recommendService.recommend(
+            request(candidates = candidates, mood = MoodTag.DATE)
+        )
+        assertThat(result.map { it.kakaoPlaceId }).containsExactlyInAnyOrder("1", "2")
+        then(feedRepository).should().countMoodVotes(MoodTag.DATE, restaurantIds)
+        then(restaurantListItemRepository).should().countMoodVotes(MoodTag.DATE, restaurantIds)
+
     }
 }
