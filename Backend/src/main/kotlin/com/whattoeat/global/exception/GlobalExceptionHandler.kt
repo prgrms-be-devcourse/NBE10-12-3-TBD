@@ -2,6 +2,7 @@ package com.whattoeat.global.exception
 
 import com.whattoeat.global.response.ErrorResponse
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.crossstore.ChangeSetPersister
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -142,6 +143,10 @@ class GlobalExceptionHandler {
     fun handleInvalidImageFormat(e: InvalidImageFormatException): ResponseEntity<ErrorResponse> =
         badRequest(e.message)
 
+    @ExceptionHandler(InvalidRecommendParameterException::class)
+    fun handleInvalidRecommendParameter(e: InvalidRecommendParameterException): ResponseEntity<ErrorResponse> =
+        badRequest(e.message)
+    
     private fun notFound(message: String?): ResponseEntity<ErrorResponse> =
         status(HttpStatus.NOT_FOUND, message)
 

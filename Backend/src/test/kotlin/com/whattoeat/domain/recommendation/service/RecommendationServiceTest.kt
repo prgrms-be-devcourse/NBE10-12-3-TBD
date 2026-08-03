@@ -1,0 +1,149 @@
+package com.whattoeat.domain.recommendation.service
+
+import com.whattoeat.domain.recommendation.dto.RecommendRequest
+import com.whattoeat.domain.recommendation.dto.RecommendSort
+import com.whattoeat.domain.restaurant.dto.RestaurantRequest
+import com.whattoeat.domain.restaurant.entity.Category
+import com.whattoeat.global.exception.InvalidRecommendParameterException
+import com.whattoeat.global.exception.RestaurantNotFoundException
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Test
+
+class RecommendationServiceTest {
+    private val recommendService = RecommendService()
+
+    private fun candidate(
+        kakaoId: String,
+        categoryName: String,
+        lat: Double = 37.5,
+        lng: Double = 127.0
+    ) = RestaurantRequest.FromKakao(
+        kakaoPlaceId = kakaoId,
+        name = "식당$kakaoId",
+        categoryName = categoryName,
+        address = "수원시 팔달구 행궁동 1-1",
+        roadAddress = null,
+        region1 = "경기",
+        region2 = "수원시",
+        region3 = "행궁동",
+        region4 = null,
+        phone = null,
+        lat = lat,
+        lng = lng
+    )
+
+    private fun request(
+        candidates: List<RestaurantRequest.FromKakao>,
+        category: Category? = null,
+        sort: RecommendSort = RecommendSort.RANDOM,
+        lat: Double? = null,
+        lng: Double? = null,
+        exclude: List<String> = emptyList()
+    ) = RecommendRequest(candidates, category, sort, lat, lng, exclude)
+
+    @Test
+    fun `RAMDOM - 필터 없이 전체 반환`() {
+        val result = recommendService.recommend(
+            request(
+                listOf(
+                    candidate("1", "음식점 > 한식"),
+                    candidate("2", "음식점 > 치킨"),
+                    candidate("3", "카페 > 커피전문점")
+                )
+            )
+        )
+
+        assertThat(result.map { it.kakaoPlaceId }).containsExactlyInAnyOrder("1", "2", "3")
+        assertThat(result.first { it.kakaoPlaceId == "2" }.category).isEqualTo(Category.CHICKEN)
+        assertThat(result.first { it.kakaoPlaceId == "2" }.categoryLabel).isEqualTo("치킨")
+    }
+
+    @Test
+    fun `카테고리 지정 시 매핑 결과 일치하는 후보 반환`() {
+        val result = recommendService.recommend(
+            request(
+                listOf(
+                    candidate("1", "음식점 > 한식"),
+                    candidate("2", "카페 > 커피전문점"),
+                    candidate("3", "음식점 > 카페 > 테마카페"),
+                    candidate("4", "여가시설 > 보드카페")
+                ),
+                category = Category.CAFE
+            )
+        )
+
+        assertThat(result.map { it.kakaoPlaceId }).containsExactlyInAnyOrder("2", "3")
+    }
+
+    @Test
+    fun `중복 id 제거와 exclude 적용`() {
+        val result = recommendService.recommend(
+            request(
+                listOf(
+                    candidate("1", "음식점 > 한식"),
+                    candidate("1", "음식점 > 한식"),
+                    candidate("2", "음식점 > 치킨"),
+                    candidate("3", "음식점 > 일식")
+                ),
+                exclude = listOf("2")
+            )
+        )
+
+        assertThat(result.map { it.kakaoPlaceId }).containsExactlyInAnyOrder("1", "3")
+    }
+
+    @Test
+    fun `전부 걸러지면 RestaurantNotFoundException`() {
+        assertThatThrownBy {
+            recommendService.recommend(
+                request(listOf(candidate("1", "여가시설 > 만화방")))
+            )
+        }
+            .isInstanceOf(RestaurantNotFoundException::class.java)
+            .hasMessage("조건에 맞는 식당이 없습니다.")
+    }
+
+    @Test
+    fun `DISTANCE - 거리 오름차순과 distanceMeter 계산`() {
+        val result = recommendService.recommend(
+            request(
+                listOf(
+                    candidate("far", "음식점 > 한식", lat = 37.51, lng = 127.01),
+                    candidate("near", "음식점 > 한식", lat = 37.5001, lng = 127.0001)
+                ),
+                sort = RecommendSort.DISTANCE,
+                lat = 37.5,
+                lng = 127.0
+            )
+        )
+
+        assertThat(result.map { it.kakaoPlaceId }).containsExactly("near", "far")
+        assertThat(result[0].distanceMeter!!).isLessThan(result[1].distanceMeter!!)
+    }
+
+    @Test
+    fun `DISTANCE인데 좌표 없으면 InvalidRecommendParameterException`() {
+        assertThatThrownBy {
+            recommendService.recommend(
+                request(listOf(candidate("1", "음식점 > 한식")), sort = RecommendSort.DISTANCE)
+            )
+        }.isInstanceOf(InvalidRecommendParameterException::class.java)
+    }
+
+    @Test
+    fun `좌표 범위 초과 또는 한쪽만 전달되면 InvalidRecommendParameterException`() {
+        assertThatThrownBy {
+            recommendService.recommend(
+                request(listOf(candidate("1", "음식점 > 한식")), lat = 91.0, lng = 127.0)
+            )
+        }.isInstanceOf(InvalidRecommendParameterException::class.java)
+
+        assertThatThrownBy {
+            recommendService.recommend(
+                request(listOf(candidate("1", "음식점 > 한식")), lat = 37.5)
+            )
+        }.isInstanceOf(InvalidRecommendParameterException::class.java)
+    }
+
+}
