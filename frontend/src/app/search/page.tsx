@@ -245,6 +245,8 @@ function SearchPage() {
    */
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
 
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+
   /**
    * 사용자가 지도를 직접 움직였을 때
    * "이 지역 다시 검색" 버튼 표시 여부
@@ -261,6 +263,11 @@ function SearchPage() {
    * 지도 HTML 영역
    */
   const mapRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * 검색 결과 리스트 영역
+   */
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
   /**
    * 실제 카카오 지도 객체
@@ -675,6 +682,17 @@ function SearchPage() {
 
       markerElement.addEventListener("mouseleave", () => {
         setHoveredPlaceId(null);
+      });
+
+      markerElement.addEventListener("click", () => {
+        setSelectedPlaceId(restaurant.kakaoPlaceId);
+
+        document
+          .getElementById(`place-${restaurant.kakaoPlaceId}`)
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
       });
 
       const overlay = new maps.CustomOverlay({
@@ -2028,6 +2046,7 @@ function SearchPage() {
 
             {/* 검색 결과 */}
             <div
+              ref={listContainerRef}
               onScroll={handleResultScroll}
               className="min-h-0 flex-1 overflow-y-auto"
             >
@@ -2051,6 +2070,7 @@ function SearchPage() {
                 <div className="divide-y divide-hairline-soft">
                   {filtered.map((restaurant, index) => (
                     <button
+                      id={`place-${restaurant.kakaoPlaceId}`}
                       key={restaurant.kakaoPlaceId}
                       type="button"
                       onMouseEnter={() => {
