@@ -5,15 +5,24 @@ import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { apiFetchJson } from "@/lib/api";
 
+type NotificationType = "NEW_FEED" | "FEED_LIKE" | "FEED_COMMENT" | "FOLLOW" | "LIST_SHARE";
+
 interface NotificationItem {
   id: number;
   actorId: number;
   actorNickname: string;
   feedId: number | null;
-  type: "NEW_FEED";
+  restaurantListId: number | null;
+  type: NotificationType;
   message: string;
   isRead: boolean;
   createdAt: string;
+}
+
+interface NotificationCursorResponse {
+  content: NotificationItem[];
+  nextCursor: number | null;
+  hasNext: boolean;
 }
 
 function formatCreatedAt(value: string) {
@@ -33,9 +42,9 @@ export function NotificationBell() {
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
-    const res = await apiFetchJson<NotificationItem[]>("/api/v1/notifications");
+    const res = await apiFetchJson<NotificationCursorResponse>("/api/v1/notifications");
     if (res.ok && res.data) {
-      setNotifications(res.data);
+      setNotifications(res.data.content ?? []);
     }
     setLoading(false);
   }, []);
@@ -88,8 +97,26 @@ export function NotificationBell() {
     }
 
     setOpen(false);
-    if (notification.feedId) {
-      router.push("/feed");
+    switch (notification.type) {
+      case "NEW_FEED":
+        // 팔로우한 유저의 새 글 → 팔로잉 탭
+        if (notification.feedId) {
+          router.push(`/feed?tab=following&highlight=${notification.feedId}`);
+        }
+        break;
+      case "FEED_LIKE":
+      case "FEED_COMMENT":
+        // 내 피드에 대한 반응 → 내 피드는 팔로잉 탭에 안 뜨므로 추천 탭으로
+        if (notification.feedId) {
+          router.push(`/feed?tab=recommended&highlight=${notification.feedId}`);
+        }
+        break;
+      case "FOLLOW":
+        if (notification.actorId) router.push(`/profile/${notification.actorId}`);
+        break;
+      case "LIST_SHARE":
+        if (notification.restaurantListId) router.push(`/lists/${notification.restaurantListId}`);
+        break;
     }
   };
 

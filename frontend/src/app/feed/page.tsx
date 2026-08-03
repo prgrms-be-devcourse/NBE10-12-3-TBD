@@ -50,6 +50,7 @@ function FeedContent() {
   const searchParams = useSearchParams();
   const activeTab =
     searchParams.get("tab") === "recommended" ? "recommended" : "following";
+  const highlightFeedId = searchParams.get("highlight");
 
   const [posts, setPosts] = useState<Feed[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,17 @@ function FeedContent() {
     null,
   );
   const [openMenuFeedId, setOpenMenuFeedId] = useState<number | null>(null);
+
+  // highlight 파라미터가 있으면 해당 피드로 스크롤 + 하이라이트 (알림 클릭 진입)
+  useEffect(() => {
+    if (!highlightFeedId || loading) return;
+    const el = document.getElementById(`feed-${highlightFeedId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.add("ring-2", "ring-primary");
+    const timer = setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
+    return () => clearTimeout(timer);
+  }, [highlightFeedId, loading, posts]);
 
   const handleOpenComments = (feedId: number) => {
     setActiveCommentFeedId(feedId);
@@ -367,7 +379,8 @@ function FeedContent() {
             {posts.map((post) => (
               <article
                 key={post.feedId}
-                className="rounded-2xl bg-surface p-5 border border-hairline-soft shadow-sm"
+                id={`feed-${post.feedId}`}
+                className="rounded-2xl bg-surface p-5 border border-hairline-soft shadow-sm scroll-mt-20"
               >
                 {/* Author */}
                 <div className="flex items-center justify-between">

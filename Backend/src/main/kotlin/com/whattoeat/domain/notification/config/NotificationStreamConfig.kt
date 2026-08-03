@@ -1,8 +1,12 @@
 package com.whattoeat.domain.notification.config
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.whattoeat.domain.notification.messaging.NotificationStreamPublisher
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.RedisSystemException
 import org.springframework.data.redis.connection.stream.ReadOffset
@@ -13,6 +17,11 @@ class NotificationStreamConfig(
     private val redisTemplate: RedisTemplate<String, String>
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
+
+    // Spring Boot의 JacksonAutoConfiguration이 활성화되지 않은 경우를 대비한 fallback bean
+    @Bean
+    @ConditionalOnMissingBean(ObjectMapper::class)
+    fun objectMapper(): ObjectMapper = jacksonObjectMapper()
 
     @PostConstruct
     fun ensureConsumerGroup() {
