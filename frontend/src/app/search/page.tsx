@@ -481,24 +481,29 @@ function SearchPage() {
    * 카카오맵 SDK 로딩
    */
   useEffect(() => {
-    if (!mapRef.current || typeof window === "undefined") {
+    if (typeof window === "undefined" || !mapRef.current) {
       return;
     }
 
-    const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY;
+    const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
 
     /**
-     * 실제 지도 생성
+     * 환경변수를 먼저 확인해야
+     * appkey=undefined 스크립트가 생성되지 않음
      */
+    if (!kakaoKey) {
+      setError(
+        "NEXT_PUBLIC_KAKAO_JS_KEY가 설정되지 않았습니다. .env.local을 확인하세요.",
+      );
+
+      return;
+    }
+
     const initMap = () => {
       if (!mapRef.current || !window.kakao?.maps) {
         return;
       }
 
-      /**
-       * 처음에는 대한민국 전체가
-       * 대략 보이도록 생성
-       */
       const kakaoMap = new window.kakao.maps.Map(mapRef.current, {
         center: new window.kakao.maps.LatLng(36.5, 127.8),
         level: 13,
@@ -517,28 +522,17 @@ function SearchPage() {
       };
 
       mapsWithEvent.event.addListener(kakaoMap, "dragend", () => {
-        if (programmaticMapMoveRef.current) {
-          return;
+        if (!programmaticMapMoveRef.current) {
+          setShowResearchButton(true);
         }
-
-        setShowResearchButton(true);
       });
 
       mapsWithEvent.event.addListener(kakaoMap, "zoom_changed", () => {
-        if (programmaticMapMoveRef.current) {
-          return;
+        if (!programmaticMapMoveRef.current) {
+          setShowResearchButton(true);
         }
-
-        setShowResearchButton(true);
       });
 
-      /**
-       * 위치 권한이 있으면
-       * 초기 화면을 현재 위치로 이동
-       *
-       * 여기서는 검색은 하지 않고
-       * 지도 이동만 함
-       */
       if (!navigator.geolocation) {
         return;
       }
@@ -555,12 +549,9 @@ function SearchPage() {
           );
 
           kakaoMap.setCenter(currentPosition);
-
           kakaoMap.setLevel(5);
         },
-
         () => {},
-
         {
           enableHighAccuracy: true,
           timeout: 10000,
@@ -570,74 +561,65 @@ function SearchPage() {
     };
 
     const loadMap = () => {
-      if (window.kakao?.maps) {
-        window.kakao.maps.load(initMap);
+      if (!window.kakao?.maps) {
+        return;
       }
+
+      window.kakao.maps.load(initMap);
     };
 
     /**
-     * SDK가 이미 로드된 경우
+     * SDK가 이미 정상 로드됨
      */
     if (window.kakao?.maps) {
       loadMap();
-
       return;
     }
 
-    /**
-     * script 태그가 이미 있는 경우
-     */
-    const existing = document.getElementById(
+    let existing = document.getElementById(
       "kakao-map-sdk",
     ) as HTMLScriptElement | null;
 
+    /**
+     * 이전에 undefined 키 또는 다른 키로 생성된
+     * 잘못된 스크립트는 제거
+     */
+    const expectedAppKey = `appkey=${encodeURIComponent(kakaoKey)}`;
+
+    if (existing && !existing.src.includes(expectedAppKey)) {
+      existing.remove();
+      existing = null;
+    }
+
+    /**
+     * 현재 키로 생성된 스크립트가 이미 로딩 중
+     */
     if (existing) {
       existing.addEventListener("load", loadMap);
-
-      const check = setInterval(() => {
-        if (window.kakao?.maps) {
-          clearInterval(check);
-
-          loadMap();
-        }
-      }, 100);
+      existing.addEventListener("error", () => {
+        setError(
+          "카카오맵 SDK를 불러오지 못했습니다. JS 키와 도메인 등록을 확인하세요.",
+        );
+      });
 
       return () => {
-        clearInterval(check);
-
-        existing.removeEventListener("load", loadMap);
+        existing?.removeEventListener("load", loadMap);
       };
     }
 
     /**
-     * 카카오 JS 키 없음
-     */
-    if (!kakaoKey) {
-      const raf = requestAnimationFrame(() => {
-        setError(
-          "카카오맵 JS 키가 설정되지 않았습니다. .env.local을 확인하세요.",
-        );
-      });
-
-      return () => cancelAnimationFrame(raf);
-    }
-
-    /**
-     * SDK script 생성
+     * 새 SDK 스크립트 생성
      */
     const script = document.createElement("script");
 
     script.id = "kakao-map-sdk";
-
     script.src =
       `https://dapi.kakao.com/v2/maps/sdk.js` +
-      `?appkey=${kakaoKey}` +
+      `?appkey=${encodeURIComponent(kakaoKey)}` +
       `&libraries=services` +
       `&autoload=false`;
 
     script.async = true;
-    script.crossOrigin = "anonymous";
-    script.referrerPolicy = "origin";
 
     script.onload = loadMap;
 
@@ -648,6 +630,11 @@ function SearchPage() {
     };
 
     document.head.appendChild(script);
+
+    return () => {
+      script.onload = null;
+      script.onerror = null;
+    };
   }, []);
 
   /**
