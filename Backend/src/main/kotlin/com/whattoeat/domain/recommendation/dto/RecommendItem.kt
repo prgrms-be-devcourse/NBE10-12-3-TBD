@@ -6,5 +6,7 @@ data class RecommendItem(
     val kakaoPlaceId: String,
     val category: Category,
     val categoryLabel: String,
-    val distanceMeter: Int?
+    val distanceMeter: Int?,
+    val name: String,
+    val categoryName: String?,
 )

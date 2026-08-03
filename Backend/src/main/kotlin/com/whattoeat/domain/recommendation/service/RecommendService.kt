@@ -1,12 +1,16 @@
 package com.whattoeat.domain.recommendation.service
 
+import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.recommendation.dto.RecommendItem
 import com.whattoeat.domain.recommendation.dto.RecommendRequest
 import com.whattoeat.domain.recommendation.dto.RecommendSort
 import com.whattoeat.domain.restaurant.dto.RestaurantRequest
 import com.whattoeat.domain.restaurant.entity.Category
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurant.mapper.categoryLabel
 import com.whattoeat.domain.restaurant.mapper.toCategory
+import com.whattoeat.domain.restaurant.repository.RestaurantRepository
+import com.whattoeat.domain.restaurantlist.repository.RestaurantListItemRepository
 import com.whattoeat.global.exception.InvalidRecommendParameterException
 import com.whattoeat.global.exception.RestaurantNotFoundException
 import org.springframework.stereotype.Service
@@ -18,7 +22,11 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 @Service
-class RecommendService {
+class RecommendService(
+    private val restaurantRepository: RestaurantRepository,
+    private val feedRepository: FeedRepository,
+    private val restaurantListItemRepository: RestaurantListItemRepository
+) {
 
     fun recommend(request: RecommendRequest): List<RecommendItem> {
         validateCoordinates(request.lat, request.lng)
@@ -40,9 +48,34 @@ class RecommendService {
         }
 
         return when (request.sort) {
-            RecommendSort.RANDOM -> items.shuffled()
+            RecommendSort.RANDOM -> filterByMoodScore(items, request.mood)
             RecommendSort.DISTANCE -> items.sortedBy { it.distanceMeter ?: Int.MAX_VALUE }
         }
+    }
+
+    private fun filterByMoodScore(items: List<RecommendItem>, mood: MoodTag?): List<RecommendItem> {
+        if (mood == null) return items.shuffled()
+
+        val kakaoToDbId = restaurantRepository
+            .findByKakaoPlaceIdIn(items.map { it.kakaoPlaceId })
+            .mapNotNull { restaurant -> restaurant.id?.let { id -> restaurant.kakaoPlaceId to id } }.toMap()
+        val dbIds = kakaoToDbId.values.toList()
+
+        val votes = mutableMapOf<Long, Long>()
+
+        if (dbIds.isNotEmpty()) {
+            feedRepository.countMoodVotes(mood, dbIds)
+                .forEach { votes.merge(it.restaurantId, it.voteCount, Long::plus) }
+            restaurantListItemRepository.countMoodVotes(mood, dbIds)
+                .forEach { votes.merge(it.restaurantId, it.voteCount, Long::plus) }
+        }
+
+        val matched = items.filter { item ->
+            val ruleScore = moodRuleScore(mood, item.category, item.name, item.categoryName)
+            val voteScore = votes[kakaoToDbId[item.kakaoPlaceId]] ?: 0L
+            ruleScore + voteScore > 0
+        }
+        return (matched.ifEmpty { items }).shuffled()
     }
 
     // 1단계 분류가 음식점/카페인 것만 (여가시설 > 보드카페 같은 비카페 CE7 노이즈 제거)
@@ -57,6 +90,8 @@ class RecommendService {
     private fun toItem(candidate: RestaurantRequest.FromKakao, lat: Double?, lng: Double?): RecommendItem =
         RecommendItem(
             kakaoPlaceId = candidate.kakaoPlaceId,
+            name = candidate.name,
+            categoryName = candidate.categoryName,
             category = toCategory(candidate.categoryName),
             categoryLabel = categoryLabel(candidate.categoryName),
             distanceMeter = if (lat != null && lng != null) {

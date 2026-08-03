@@ -2,6 +2,7 @@ package com.whattoeat.domain.recommendation.dto
 
 import com.whattoeat.domain.restaurant.dto.RestaurantRequest
 import com.whattoeat.domain.restaurant.entity.Category
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotEmpty
 
@@ -12,5 +13,6 @@ data class RecommendRequest(
     val sort: RecommendSort = RecommendSort.RANDOM,
     val lat: Double? = null,
     val lng: Double? = null,
-    val exclude: List<String> = emptyList()
+    val exclude: List<String> = emptyList(),
+    val mood: MoodTag? = null,
 )

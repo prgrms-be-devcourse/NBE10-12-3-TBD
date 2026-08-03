@@ -1,17 +1,38 @@
 package com.whattoeat.domain.recommendation.service
 
+import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.recommendation.dto.RecommendRequest
 import com.whattoeat.domain.recommendation.dto.RecommendSort
 import com.whattoeat.domain.restaurant.dto.RestaurantRequest
 import com.whattoeat.domain.restaurant.entity.Category
+import com.whattoeat.domain.restaurant.entity.MoodTag
+import com.whattoeat.domain.restaurant.repository.RestaurantRepository
+import com.whattoeat.domain.restaurantlist.repository.RestaurantListItemRepository
 import com.whattoeat.global.exception.InvalidRecommendParameterException
 import com.whattoeat.global.exception.RestaurantNotFoundException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.BDDMockito.given
+import org.mockito.InjectMocks
+import org.mockito.Mock
+import org.mockito.junit.jupiter.MockitoExtension
 
+@ExtendWith(MockitoExtension::class)
 class RecommendationServiceTest {
-    private val recommendService = RecommendService()
+
+    @Mock
+    lateinit var restaurantRepository: RestaurantRepository
+
+    @Mock
+    lateinit var feedRepository: FeedRepository
+
+    @Mock
+    lateinit var restaurantListItemRepository: RestaurantListItemRepository
+
+    @InjectMocks
+    lateinit var recommendService: RecommendService
 
     private fun candidate(
         kakaoId: String,
@@ -39,8 +60,17 @@ class RecommendationServiceTest {
         sort: RecommendSort = RecommendSort.RANDOM,
         lat: Double? = null,
         lng: Double? = null,
-        exclude: List<String> = emptyList()
-    ) = RecommendRequest(candidates, category, sort, lat, lng, exclude)
+        exclude: List<String> = emptyList(),
+        mood: MoodTag? = null,
+    ) = RecommendRequest(
+        candidates = candidates,
+        category = category,
+        sort = sort,
+        lat = lat,
+        lng = lng,
+        exclude = exclude,
+        mood = mood
+    )
 
     @Test
     fun `RAMDOM - 필터 없이 전체 반환`() {
@@ -146,4 +176,35 @@ class RecommendationServiceTest {
         }.isInstanceOf(InvalidRecommendParameterException::class.java)
     }
 
+    @Test
+    fun `mood가 있으면 분위기 룰에 맞는 후보만 반환`() {
+        val candidates = listOf(
+            candidate("1", "음식점 > 한식"),
+            candidate("2", "카페 > 커피전문점")
+        )
+
+        given(restaurantRepository
+            .findByKakaoPlaceIdIn(listOf("1", "2"))).willReturn(emptyList())
+        val result = recommendService.recommend(
+            request(candidates = candidates, mood = MoodTag.DATE)
+        )
+
+        assertThat(result.map { it.kakaoPlaceId }).containsExactly("2")
+    }
+
+    @Test
+    fun `mood 룰, 투표에 맞는 후보 없으면 전체 후보 반환`() {
+        val candidates = listOf(
+            candidate("1", "음식점 > 한식"),
+            candidate("2", "음식점 > 아시아음식")
+        )
+
+        given(restaurantRepository
+            .findByKakaoPlaceIdIn(listOf("1", "2"))).willReturn(emptyList())
+        val result = recommendService.recommend(
+            request(candidates = candidates, mood = MoodTag.DATE)
+        )
+
+        assertThat(result.map { it.kakaoPlaceId }).containsExactlyInAnyOrder("1", "2")
+    }
 }

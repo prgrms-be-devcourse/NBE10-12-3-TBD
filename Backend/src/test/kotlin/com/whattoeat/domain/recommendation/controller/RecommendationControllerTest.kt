@@ -47,9 +47,24 @@ class RecommendationControllerTest {
 
     @Test
     fun `recommend 성공 - 정렬된 recommendation 반환`() {
-        given(recommendService.recommend(any() ?: RecommendRequest(emptyList()))).willReturn(                                          listOf(
-                RecommendItem("k1", Category.CAFE, "커피전문점", null),
-                RecommendItem("k2", Category.CAFE, "테마카페", 350)
+        given(recommendService.recommend(any() ?: RecommendRequest(emptyList()))).willReturn(
+            listOf(
+                RecommendItem(
+                    kakaoPlaceId = "k1",
+                    category = Category.CAFE,
+                    categoryLabel = "커피전문점",
+                    distanceMeter = null,
+                    name = "행궁카페",
+                    categoryName = "카페 > 커피전문점"
+                ),
+                RecommendItem(
+                    kakaoPlaceId = "k2",
+                    category = Category.CAFE,
+                    categoryLabel = "전통찻집",
+                    distanceMeter = 350,
+                    name = "행궁전통찻집",
+                    categoryName = "카페 > 전통찻집"
+                )
             )
         )
         mockMvc.perform(
