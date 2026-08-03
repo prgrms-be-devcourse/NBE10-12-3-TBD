@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import java.time.LocalDateTime
 import java.util.Optional
 
 interface FollowRepository : JpaRepository<Follow, Long> {
@@ -34,4 +35,28 @@ interface FollowRepository : JpaRepository<Follow, Long> {
 """,
     )
     fun findFollowingIdsByFollowerIds(@Param("followerIds") followerIds: Collection<Long>): List<Long>
+
+    @Query(
+        """
+    select f.following.id, count(f)
+    from Follow f
+    where f.following.id in :userIds
+    group by f.following.id
+""",
+    )
+    fun countFollowersByUserIds(@Param("userIds") userIds: Collection<Long>): List<Array<Any>>
+
+    @Query(
+        """
+    select f.following.id, count(f)
+    from Follow f
+    where f.following.id in :userIds
+      and f.createdAt >= :since
+    group by f.following.id
+""",
+    )
+    fun countRecentFollowersByUserIds(
+        @Param("userIds") userIds: Collection<Long>,
+        @Param("since") since: LocalDateTime,
+    ): List<Array<Any>>
 }

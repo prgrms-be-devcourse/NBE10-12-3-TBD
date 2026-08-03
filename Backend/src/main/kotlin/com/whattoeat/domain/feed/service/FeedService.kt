@@ -47,6 +47,24 @@ import org.springframework.web.multipart.MultipartFile
         private const val SECOND_DEGREE_AUTHOR_BONUS = 6.0
         private const val FOLLOWING_LIKE_BONUS = 3.0
         private const val TIME_DECAY_PER_HOUR = 0.015
+
+        // 최근 이 시간 안에 달린 좋아요/댓글/팔로우만 "급증" 신호로 인정한다.
+        private const val SURGE_WINDOW_HOURS = 24L
+
+        // 최근 급증 신호 임계값: 하나라도 넘으면 "떡상 중"으로 간주한다.
+        private const val SURGE_RECENT_LIKE_THRESHOLD = 5L //좋아요 5개 이상부트 급증
+        private const val SURGE_RECENT_COMMENT_THRESHOLD = 3L // 댓글 3개 이상부터 급증
+        private const val SURGE_RECENT_FOLLOWER_THRESHOLD = 3L // 팔로워가 3명이상부터 늘면 급증
+
+        // 팔로워 수가 이 값 이상이면 "인플루언서"로 간주해 노출 가산 대상에 포함한다.
+        private const val POPULAR_AUTHOR_FOLLOWER_THRESHOLD = 50L
+
+        // 스포트라이트(급증/인기 작성자) 후보 피드는 점수 정렬과 무관하게
+        // 이 간격마다 한 번씩 의도적으로 노출시킨다.
+        private const val SPOTLIGHT_INTERVAL = 5
+
+        // 한 페이지 계산에 사용할 스포트라이트 후보 최대 개수
+        private const val SPOTLIGHT_POOL_LIMIT = 10
     }
 
     @Transactional
@@ -104,9 +122,7 @@ import org.springframework.web.multipart.MultipartFile
     private fun countCommentByFeedIds(feeds: List<Feed>): Map<Long, Long> {
         val feedIds = feeds.map { it.id!! }
         if (feedIds.isEmpty()) return emptyMap()
-        return commentRepository.countByFeedIds(feedIds).associate { row ->
-            (row[0] as Long) to ((row[1] as? Number)?.toLong() ?: 0L)
-        }
+        return toCountMap(commentRepository.countByFeedIds(feedIds))
     }
 
     private fun findLikedFeedIds(currentUserId: Long?, feeds: List<Feed>): Set<Long> {
@@ -202,14 +218,17 @@ import org.springframework.web.multipart.MultipartFile
                 )
             }
 
+        val spotlightFeeds = pickSpotlightFeeds(candidates)
+        val finalOrder = interleaveSpotlightFeeds(ranked, spotlightFeeds)
+
         val start = pageable.offset.toInt()
-        if (start >= ranked.size) {
-            return PageImpl(emptyList(), pageable, ranked.size.toLong())
+        if (start >= finalOrder.size) {
+            return PageImpl(emptyList(), pageable, finalOrder.size.toLong())
         }
-        val end = minOf(start + pageable.pageSize, ranked.size)
+        val end = minOf(start + pageable.pageSize, finalOrder.size)
 
         val content =
-            ranked.subList(start, end).map { feed ->
+            finalOrder.subList(start, end).map { feed ->
                 FeedListResponse.from(
                     feed,
                     commentCounts.getOrDefault(feed.id, 0L),
@@ -217,8 +236,70 @@ import org.springframework.web.multipart.MultipartFile
                 )
             }
 
-        return PageImpl(content, pageable, ranked.size.toLong())
+        return PageImpl(content, pageable, finalOrder.size.toLong())
     }
+
+    // 최근 SURGE_WINDOW_HOURS 안에 좋아요/댓글이 급증했거나, 작성자가 팔로워가 많은(혹은
+    // 최근 팔로워가 급증한) 인플루언서인 피드를 "스포트라이트" 후보로 뽑는다.
+    private fun pickSpotlightFeeds(candidates: List<Feed>): List<Feed> {
+        if (candidates.isEmpty()) return emptyList()
+
+        val since = LocalDateTime.now().minusHours(SURGE_WINDOW_HOURS)
+        val candidateIds = candidates.map { it.id!! }
+        val authorIds = candidates.map { it.user.id!! }.toHashSet()
+
+        val recentLikeCounts = toCountMap(feedLikeRepository.countRecentLikesByFeedIds(candidateIds, since))
+        val recentCommentCounts = toCountMap(commentRepository.countRecentCommentsByFeedIds(candidateIds, since))
+        val followerCounts = toCountMap(followRepository.countFollowersByUserIds(authorIds))
+        val recentFollowerCounts = toCountMap(followRepository.countRecentFollowersByUserIds(authorIds, since))
+
+        return candidates
+            .filter { feed ->
+                val isSurgingEngagement =
+                    recentLikeCounts.getOrDefault(feed.id, 0L) >= SURGE_RECENT_LIKE_THRESHOLD ||
+                        recentCommentCounts.getOrDefault(feed.id, 0L) >= SURGE_RECENT_COMMENT_THRESHOLD
+                val isPopularAuthor = followerCounts.getOrDefault(feed.user.id, 0L) >= POPULAR_AUTHOR_FOLLOWER_THRESHOLD
+                val isSurgingAuthor =
+                    recentFollowerCounts.getOrDefault(feed.user.id, 0L) >= SURGE_RECENT_FOLLOWER_THRESHOLD
+
+                isSurgingEngagement || isPopularAuthor || isSurgingAuthor
+            }
+            .sortedByDescending { feed ->
+                recentLikeCounts.getOrDefault(feed.id, 0L) * LIKE_WEIGHT +
+                    recentCommentCounts.getOrDefault(feed.id, 0L) * COMMENT_WEIGHT +
+                    recentFollowerCounts.getOrDefault(feed.user.id, 0L) +
+                    followerCounts.getOrDefault(feed.user.id, 0L)
+            }
+            .take(SPOTLIGHT_POOL_LIMIT)
+    }
+
+    // 점수순으로 정렬된 목록에서 스포트라이트 피드를 제거한 뒤, SPOTLIGHT_INTERVAL개마다
+    // 한 번씩 의도적으로 스포트라이트 피드를 끼워 넣는다. 자연 순위와 무관하게 주기적으로
+    // 노출시키는 것이 목적이므로, 원래 위치에 남겨두지 않고 슬롯 자리에서만 노출한다.
+    private fun interleaveSpotlightFeeds(rankedFeeds: List<Feed>, spotlightFeeds: List<Feed>): List<Feed> {
+        if (spotlightFeeds.isEmpty()) return rankedFeeds
+
+        val spotlightIds = spotlightFeeds.mapNotNull { it.id }.toHashSet()
+        val remaining = rankedFeeds.filterNot { spotlightIds.contains(it.id) }
+        val spotlightQueue = ArrayDeque(spotlightFeeds)
+
+        val result = ArrayList<Feed>(rankedFeeds.size)
+        remaining.forEachIndexed { index, feed ->
+            result.add(feed)
+            val isSpotlightSlot = (index + 1) % SPOTLIGHT_INTERVAL == 0
+            if (isSpotlightSlot && spotlightQueue.isNotEmpty()) {
+                result.add(spotlightQueue.removeFirst())
+            }
+        }
+        // 슬롯이 모자라 못 끼워 넣은 스포트라이트 피드는 끝에 이어붙인다.
+        result.addAll(spotlightQueue)
+        return result
+    }
+
+    private fun toCountMap(rows: List<Array<Any>>): Map<Long, Long> =
+        rows.associate { row ->
+            (row[0] as Long) to ((row[1] as? Number)?.toLong() ?: 0L)
+        }
 
     // 좋아요/댓글 수는 로그 스케일로 눌러 소수의 인기글이 점수를 독식하지 않게 하고,
     // 팔로우 신호(2차 팔로우 작성자 / 팔로우한 사람이 좋아요)는 가산점으로 반영,

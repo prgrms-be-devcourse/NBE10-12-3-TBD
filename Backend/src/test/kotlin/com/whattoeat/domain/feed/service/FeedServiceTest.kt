@@ -16,13 +16,13 @@ import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.domain.user.entity.Provider
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.global.exception.FeedNotFoundException
-import java.time.LocalDateTime
 import java.util.Optional
 import java.util.function.Function
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.ArgumentMatchers.anyLong
@@ -44,6 +44,14 @@ import org.springframework.test.context.event.ApplicationEvents
 import org.springframework.test.context.event.RecordApplicationEvents
 import org.springframework.test.util.ReflectionTestUtils
 import org.springframework.web.multipart.MultipartFile
+
+// Kotlin의 non-null 파라미터에 Mockito의 any(Class)를 그대로 넘기면 플랫폼 타입 null-check에 걸려
+// NPE가 발생하므로, 명시적 unchecked cast로 우회하는 헬퍼.
+private fun <T> anyValue(): T {
+    ArgumentMatchers.any<Any>()
+    @Suppress("UNCHECKED_CAST")
+    return null as T
+}
 
 @SpringBootTest
 @RecordApplicationEvents
@@ -464,5 +472,49 @@ class FeedServiceTest {
         assertThat(result.content)
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
             .containsExactly(olderFeed.id)
+    }
+
+    @Test
+    @DisplayName("최근 좋아요가 급증한 피드는 자연 순위와 무관하게 5개마다 한 번씩 노출된다")
+    fun getRecommendedFeeds_injectsSurgingFeedPeriodically() {
+        val me = createTestUser(1L, "me")
+
+        // likeCount가 높은 순으로 자연 정렬되면 surgingFeed(likeCount=0)는 맨 마지막(8번째)에 위치하게 된다.
+        val feeds =
+            (1..7).map { i ->
+                val user = createTestUser((i * 10).toLong(), "user$i")
+                Feed.builder().user(user).content("feed$i").likeCount(80 - i * 10).build()
+                    .also { ReflectionTestUtils.setField(it, "id", (i * 10).toLong()) }
+            }
+        val surgingAuthor = createTestUser(80L, "surgingAuthor")
+        val surgingFeed = createTestFeed(80L, surgingAuthor, "surging feed")
+        val candidates = feeds + surgingFeed
+
+        val pageable = PageRequest.of(0, 20)
+
+        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
+            .willReturn(PageImpl(emptyList()))
+
+        given(feedRepository.findByUser_IdNotInOrderByIdDesc(setOf(1L), PageRequest.of(0, 300)))
+            .willReturn(PageImpl(candidates))
+
+        given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
+        given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
+            .willReturn(emptyList())
+
+        // surgingFeed(80L)만 최근 24시간 내 좋아요가 급증 임계값(5) 이상 달렸다고 설정한다.
+        given(feedLikeRepository.countRecentLikesByFeedIds(anyList(), anyValue()))
+            .willReturn(listOf(arrayOf<Any>(80L, 5L)))
+        given(commentRepository.countRecentCommentsByFeedIds(anyList(), anyValue()))
+            .willReturn(emptyList())
+        given(followRepository.countFollowersByUserIds(anyList())).willReturn(emptyList())
+        given(followRepository.countRecentFollowersByUserIds(anyList(), anyValue()))
+            .willReturn(emptyList())
+
+        val result: Page<FeedListResponse> = feedService.getRecommendedFeeds(me.id, pageable)
+
+        assertThat(result.content)
+            .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
+            .containsExactly(10L, 20L, 30L, 40L, 50L, 80L, 60L, 70L)
     }
 }

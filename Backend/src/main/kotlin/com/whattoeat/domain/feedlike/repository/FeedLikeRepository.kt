@@ -1,6 +1,7 @@
 package com.whattoeat.domain.feedlike.repository
 
 import com.whattoeat.domain.feedlike.entity.FeedLike
+import java.time.LocalDateTime
 import java.util.Optional
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
@@ -36,4 +37,18 @@ interface FeedLikeRepository : JpaRepository<FeedLike, Long> {
         """,
     )
     fun findFeedIdsLikedByUserIds(@Param("userIds") userIds: Collection<Long>): List<Long>
+
+    @Query(
+        """
+        select fl.feed.id, count(fl)
+        from FeedLike fl
+        where fl.feed.id in :feedIds
+          and fl.createdAt >= :since
+        group by fl.feed.id
+        """,
+    )
+    fun countRecentLikesByFeedIds(
+        @Param("feedIds") feedIds: List<Long>,
+        @Param("since") since: LocalDateTime,
+    ): List<Array<Any>>
 }
