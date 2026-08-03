@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MapPin, Navigation, Search } from "lucide-react";
+import { MapPin, Navigation, Search, X } from "lucide-react";
 import Link from "next/link";
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
@@ -342,6 +342,23 @@ function SearchPage() {
   const searchModeRef = useRef<
     "keyword" | "current-map-all" | "current-map-category" | "nearby" | null
   >(null);
+
+  /**
+   * 검색 요청 순서를 구분하기 위한 ID
+   *
+   * 새로운 검색이 시작될 때마다 증가하며,
+   * 가장 최근 요청의 콜백만 상태를 변경할 수 있음
+   */
+  const latestSearchRequestIdRef = useRef(0);
+
+  const createSearchRequestId = () => {
+    latestSearchRequestIdRef.current += 1;
+
+    return latestSearchRequestIdRef.current;
+  };
+
+  const isLatestSearchRequest = (requestId: number) =>
+    latestSearchRequestIdRef.current === requestId;
 
   /**
    * 새로운 검색을 시작할 때
@@ -853,7 +870,10 @@ function SearchPage() {
    * - 케이크
    */
   const fetchKeywordSearch = useCallback(
-    async (searchQuery: string): Promise<void> => {
+    async (
+      searchQuery: string,
+      requestId = createSearchRequestId(),
+    ): Promise<void> => {
       const trimmedQuery = searchQuery.trim();
 
       if (!trimmedQuery) {
@@ -885,32 +905,60 @@ function SearchPage() {
       return new Promise((resolve) => {
         places.keywordSearch(
           trimmedQuery,
-
           (
             data: KakaoPlaceItem[],
             status: string,
             pagination: KakaoPagination,
           ) => {
+            /**
+             * 이 검색보다 나중에 실행된 검색이 있으면
+             * 오래된 응답은 화면 상태를 변경하지 않음
+             */
+            if (!isLatestSearchRequest(requestId)) {
+              resolve();
+              return;
+            }
+
             if (status === services.Status.OK) {
               paginationRef.current = pagination;
-              setHasMore(pagination.hasNextPage);
 
               const foodAndCafe = data.filter(isFoodOrCafe);
               const mappedResults = mapKakaoPlaces(foodAndCafe);
+
+              /**
+               * 현재 페이지에는 음식점·카페가 없지만
+               * 다음 카카오 페이지가 남아 있다면 자동 조회
+               *
+               * loading 상태는 종료하지 않고
+               * 다음 페이지 콜백까지 기다림
+               */
+              if (mappedResults.length === 0 && pagination.hasNextPage) {
+                pagination.nextPage();
+                return;
+              }
+
+              setHasMore(pagination.hasNextPage);
 
               /**
                * 다음 페이지 요청이면
                * 기존 결과 뒤에 추가
                */
               if (isLoadingMoreRef.current) {
-                setResults((previous) =>
-                  appendUniquePlaces(previous, mappedResults),
-                );
+                if (mappedResults.length > 0) {
+                  setResults((previous) =>
+                    appendUniquePlaces(previous, mappedResults),
+                  );
+                }
 
+                /**
+                 * 마지막 페이지까지 확인했는데
+                 * 추가할 음식점·카페가 없어도 기존 결과는 유지
+                 */
                 setError("");
               } else if (mappedResults.length === 0) {
                 /**
-                 * 첫 페이지 검색 결과가 없는 경우
+                 * 모든 페이지를 확인한 뒤에도
+                 * 음식점·카페가 없는 경우
                  */
                 setResults([]);
                 setError("검색된 음식점이나 카페가 없습니다.");
@@ -922,19 +970,33 @@ function SearchPage() {
                 setError("");
               }
             } else if (status === services.Status.ZERO_RESULT) {
-              setResults([]);
+              setHasMore(false);
 
-              setError("검색 결과가 없습니다.");
+              /**
+               * 다음 페이지 요청 중 결과가 없으면
+               * 기존 목록은 유지
+               */
+              if (!isLoadingMoreRef.current) {
+                setResults([]);
+                setError("검색 결과가 없습니다.");
+              }
             } else {
-              setResults([]);
+              setHasMore(false);
 
-              setError("검색 결과를 불러오지 못했습니다.");
+              /**
+               * 추가 요청 실패 시에도
+               * 이미 표시 중인 결과는 유지
+               */
+              if (!isLoadingMoreRef.current) {
+                setResults([]);
+                setError("검색 결과를 불러오지 못했습니다.");
+              }
             }
 
             isLoadingMoreRef.current = false;
             setLoadingMore(false);
-
             setLoading(false);
+
             resolve();
           },
 
@@ -1256,7 +1318,7 @@ function SearchPage() {
    * 검색창이 비어 있고
    * 전체 카테고리를 선택한 경우 실행
    */
-  const fetchCurrentMapPlaces = () => {
+  const fetchCurrentMapPlaces = (requestId = createSearchRequestId()) => {
     if (!map) {
       setError("지도를 불러오는 중입니다.");
       return;
@@ -1323,6 +1385,10 @@ function SearchPage() {
     places.categorySearch(
       "FD6",
       (data: KakaoPlaceItem[], status: string, pagination: KakaoPagination) => {
+        if (!isLatestSearchRequest(requestId)) {
+          return;
+        }
+
         restaurantPaginationRef.current = pagination;
 
         /**
@@ -1363,6 +1429,10 @@ function SearchPage() {
     places.categorySearch(
       "CE7",
       (data: KakaoPlaceItem[], status: string, pagination: KakaoPagination) => {
+        if (!isLatestSearchRequest(requestId)) {
+          return;
+        }
+
         cafePaginationRef.current = pagination;
 
         /**
@@ -1402,7 +1472,10 @@ function SearchPage() {
    * 검색어가 없는 상태에서
    * 현재 지도 영역의 선택 카테고리 검색
    */
-  const fetchCurrentMapPlacesByCategory = (category: string) => {
+  const fetchCurrentMapPlacesByCategory = (
+    category: string,
+    requestId = createSearchRequestId(),
+  ) => {
     if (!map) {
       setError("지도를 불러오는 중입니다.");
       return;
@@ -1412,7 +1485,7 @@ function SearchPage() {
      * 전체는 음식점 + 카페 이중 검색 사용
      */
     if (category === "전체") {
-      fetchCurrentMapPlaces();
+      fetchCurrentMapPlaces(requestId);
       return;
     }
 
@@ -1447,46 +1520,69 @@ function SearchPage() {
       category,
       (data: KakaoPlaceItem[], status: string, pagination: KakaoPagination) => {
         /**
-         * 현재 카테고리 검색의 페이지네이션 저장
+         * 다른 카테고리가 나중에 선택됐다면
+         * 이전 카테고리 응답은 무시
          */
+        if (!isLatestSearchRequest(requestId)) {
+          return;
+        }
+
         paginationRef.current = pagination;
-        setHasMore(pagination.hasNextPage);
 
         if (status === services.Status.OK) {
           const foodAndCafe = data.filter(isFoodOrCafe);
           const mappedResults = mapKakaoPlaces(foodAndCafe);
 
           /**
+           * 현재 페이지의 필터 결과가 비어 있고
+           * 다음 페이지가 있다면 자동 조회
+           */
+          if (mappedResults.length === 0 && pagination.hasNextPage) {
+            pagination.nextPage();
+            return;
+          }
+
+          setHasMore(pagination.hasNextPage);
+
+          /**
            * 다음 페이지이면 기존 결과 뒤에 추가
            */
           if (isLoadingMoreRef.current) {
-            setResults((previous) =>
-              appendUniquePlaces(previous, mappedResults),
-            );
+            if (mappedResults.length > 0) {
+              setResults((previous) =>
+                appendUniquePlaces(previous, mappedResults),
+              );
+            }
 
             setError("");
           } else if (mappedResults.length === 0) {
+            /**
+             * 모든 페이지를 확인한 뒤에도
+             * 유효한 결과가 없는 경우
+             */
             setResults([]);
             setError(`현재 지도 영역에 ${category} 검색 결과가 없습니다.`);
           } else {
             /**
-             * 첫 페이지이면 결과 교체
+             * 첫 검색 결과로 교체
              */
             setResults(mappedResults);
             setError("");
           }
         } else if (status === services.Status.ZERO_RESULT) {
+          setHasMore(false);
+
           /**
            * 다음 페이지에서 결과가 없는 경우에는
-           * 기존 결과를 지우면 안 됨
+           * 기존 결과를 지우지 않음
            */
           if (!isLoadingMoreRef.current) {
             setResults([]);
             setError(`현재 지도 영역에 ${category} 검색 결과가 없습니다.`);
           }
-
-          setHasMore(false);
         } else {
+          setHasMore(false);
+
           if (!isLoadingMoreRef.current) {
             setResults([]);
             setError("검색 결과를 불러오지 못했습니다.");
@@ -1523,6 +1619,13 @@ function SearchPage() {
 
     const trimmedKeyword = keyword.trim();
 
+    /**
+     * 현재 지도 영역에서 실행하는 새로운 키워드 검색이므로
+     * 이전 검색의 페이지네이션 상태 초기화
+     */
+    resetPagination();
+    searchModeRef.current = "current-map-category";
+
     setLoading(true);
     setError("");
 
@@ -1542,28 +1645,89 @@ function SearchPage() {
     return new Promise((resolve) => {
       places.keywordSearch(
         searchKeyword,
-        (data: KakaoPlaceItem[], status: string) => {
+        (
+          data: KakaoPlaceItem[],
+          status: string,
+          pagination: KakaoPagination,
+        ) => {
+          /**
+           * 현재 지도 키워드 검색의 페이지네이션 저장
+           */
+          paginationRef.current = pagination;
+
           if (status === services.Status.OK) {
             const foodAndCafe = data.filter(isFoodOrCafe);
+            const mappedResults = mapKakaoPlaces(foodAndCafe);
 
-            if (foodAndCafe.length === 0) {
+            /**
+             * 현재 페이지에는 음식점·카페가 없지만
+             * 다음 페이지가 있다면 자동으로 계속 조회
+             */
+            if (mappedResults.length === 0 && pagination.hasNextPage) {
+              pagination.nextPage();
+              return;
+            }
+
+            setHasMore(pagination.hasNextPage);
+
+            /**
+             * 무한스크롤로 요청한 다음 페이지이면
+             * 기존 결과 뒤에 추가
+             */
+            if (isLoadingMoreRef.current) {
+              if (mappedResults.length > 0) {
+                setResults((previous) =>
+                  appendUniquePlaces(previous, mappedResults),
+                );
+              }
+
+              setError("");
+            } else if (mappedResults.length === 0) {
+              /**
+               * 모든 페이지를 확인한 뒤에도
+               * 음식점·카페 결과가 없는 경우
+               */
               setResults([]);
               setError(
                 `현재 지도 영역에 ${searchKeyword} 검색 결과가 없습니다.`,
               );
             } else {
-              setResults(mapKakaoPlaces(foodAndCafe));
+              /**
+               * 새로운 검색의 첫 유효 결과로 교체
+               */
+              setResults(mappedResults);
               setError("");
             }
           } else if (status === services.Status.ZERO_RESULT) {
-            setResults([]);
-            setError(`현재 지도 영역에 ${searchKeyword} 검색 결과가 없습니다.`);
+            setHasMore(false);
+
+            /**
+             * 다음 페이지 결과가 없는 경우에는
+             * 기존 검색 결과를 지우지 않음
+             */
+            if (!isLoadingMoreRef.current) {
+              setResults([]);
+              setError(
+                `현재 지도 영역에 ${searchKeyword} 검색 결과가 없습니다.`,
+              );
+            }
           } else {
-            setResults([]);
-            setError("검색 결과를 불러오지 못했습니다.");
+            setHasMore(false);
+
+            /**
+             * 다음 페이지 요청 실패 시에도
+             * 기존 검색 결과는 유지
+             */
+            if (!isLoadingMoreRef.current) {
+              setResults([]);
+              setError("검색 결과를 불러오지 못했습니다.");
+            }
           }
 
+          isLoadingMoreRef.current = false;
+          setLoadingMore(false);
           setLoading(false);
+
           resolve();
         },
         {
@@ -1715,6 +1879,14 @@ function SearchPage() {
    * 카테고리 변경
    */
   const handleCategoryChange = async (category: string) => {
+    /**
+     * 카테고리를 클릭할 때마다 새로운 요청 ID 발급
+     *
+     * 이후 가장 마지막으로 발급된 ID의 응답만
+     * 검색 결과를 변경할 수 있음
+     */
+    const requestId = createSearchRequestId();
+
     setShowResearchButton(false);
     setActiveCategory(category);
 
@@ -1731,7 +1903,7 @@ function SearchPage() {
      * 현재 지도 영역에서 카테고리 검색
      */
     if (!trimmedQuery) {
-      fetchCurrentMapPlacesByCategory(category);
+      fetchCurrentMapPlacesByCategory(category, requestId);
       return;
     }
 
@@ -1742,7 +1914,7 @@ function SearchPage() {
     const searchKeyword =
       category === "전체" ? trimmedQuery : `${trimmedQuery} ${category}`;
 
-    await fetchKeywordSearch(searchKeyword);
+    await fetchKeywordSearch(searchKeyword, requestId);
   };
 
   /**
@@ -1986,6 +2158,24 @@ function SearchPage() {
                     className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-hidden placeholder:text-muted-soft"
                     placeholder="지역, 식당, 카페, 디저트 검색"
                   />
+                )}
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      createSearchRequestId();
+                      setQuery("");
+                      setResults([]);
+                      setError("");
+                      setHoveredPlaceId(null);
+                      setSelectedPlaceId(null);
+                      resetPagination();
+                    }}
+                    aria-label="검색어 지우기"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-ink"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 )}
 
                 <button
