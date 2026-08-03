@@ -11,6 +11,7 @@ import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.feedlike.repository.FeedLikeRepository
 import com.whattoeat.domain.follow.entity.Follow
 import com.whattoeat.domain.follow.repository.FollowRepository
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.domain.user.entity.Provider
 import com.whattoeat.domain.user.entity.User
@@ -106,7 +107,7 @@ class FeedServiceTest {
             .email("user1@test.com")
             .provider(Provider.LOCAL)
             .build()
-        val feedCreateRequest = FeedCreateRequest("맛집이네요", null)
+        val feedCreateRequest = FeedCreateRequest("맛집이네요", null, MoodTag.SOLO)
         val image: MultipartFile? = null
 
         val savedFeed =
@@ -130,7 +131,7 @@ class FeedServiceTest {
             .provider(Provider.LOCAL)
             .build()
         ReflectionTestUtils.setField(user, "id", 1L)
-        val feedCreateRequest = FeedCreateRequest("맛집이네요", null)
+        val feedCreateRequest = FeedCreateRequest("맛집이네요", null, MoodTag.SOLO)
         val image: MultipartFile? = null
 
         val savedFeed =
