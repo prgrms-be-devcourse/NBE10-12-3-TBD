@@ -25,4 +25,5 @@ interface RestaurantRepository : JpaRepository<Restaurant, Long> {
     ) : List<Restaurant>
 
      fun findByKakaoPlaceId(kakaoPlaceId: String) : Optional<Restaurant>
+    fun findByKakaoPlaceIdIn(kakaoPlaceIds: List<String>) : List<Restaurant>
 }
