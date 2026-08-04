@@ -6,6 +6,7 @@ import { Check, ChevronLeft, Search, X } from "lucide-react";
 
 import AppShell from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
+import { buildListHref } from "@/lib/listNavigation";
 
 /* =========================================================
  * 카카오 검색 결과
@@ -585,7 +586,7 @@ export default function CreateListPage() {
        * 4. 최종 완료
        * ----------------------------------------------------- */
 
-      router.push(`/lists?selected=${listId}`);
+      router.push(buildListHref(listId, "my"));
     } catch (error) {
       console.error("리스트 저장 중 오류:", error);
 

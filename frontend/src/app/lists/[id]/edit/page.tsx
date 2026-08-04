@@ -18,6 +18,7 @@ import {
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 
 import { apiFetchJson } from "@/lib/api";
+import { buildListHref } from "@/lib/listNavigation";
 
 /* =========================================================
  * Kakao 검색 결과 원본
@@ -329,7 +330,7 @@ export default function ListEditPage() {
     if (moveAfterAlert) {
       setMoveAfterAlert(false);
 
-      router.push(`/lists?listId=${listId}`);
+      router.push(buildListHref(listId, "my"));
     }
   };
 
