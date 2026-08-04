@@ -134,6 +134,7 @@ export default function RecommendPage() {
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [recommendLoading, setRecommendLoading] = useState(false);
   const [recommendError, setRecommendError] = useState("");
+  const [distanceFallback, setDistanceFallback] = useState(false);
   const [current, setCurrent] = useState<RecommendRestaurant | null>(null);
   const [hotPlaces, setHotPlaces] = useState<HotPlace[]>([]);
 
@@ -406,15 +407,17 @@ export default function RecommendPage() {
   const fetchRecommend = async () => {
     setRecommendLoading(true);
     setRecommendError("");
+    setDistanceFallback(false);
 
     try {
+      let effectiveSort = sortBy;
+
       if (sortBy === "distance") {
         const position = await getCurrentPosition();
         if (!position) {
-          setRecommendError("현재 위치를 가져올 수 없어 거리순 추천이 불가능합니다.");
-          setCurrent(null);
-          setRecommendLoading(false);
-          return;
+          // 위치를 못 얻으면 에러 대신 랜덤으로 폴 back하고 안내 표시
+          effectiveSort = "random";
+          setDistanceFallback(true);
         }
       }
 
@@ -462,7 +465,7 @@ export default function RecommendPage() {
               })),
               category: selectedCategory !== "기타" ? categoryToEnum[selectedCategory] : null,
               mood: MOOD_TAGS.find((t) => t.label === selectedMood)?.value ?? null,
-              sort: sortBy === "distance" ? "DISTANCE" : "RANDOM",
+              sort: effectiveSort === "distance" ? "DISTANCE" : "RANDOM",
               lat: position?.lat ?? null,
               lng: position?.lng ?? null,
               exclude: [...seenIdsRef.current],
@@ -792,6 +795,12 @@ export default function RecommendPage() {
               </div>
             ) : (
               <>
+                {distanceFallback && (
+                  <p className="mb-3 rounded-xl bg-surface-soft px-4 py-2.5 text-center text-xs font-bold text-muted">
+                    현재 위치를 가져올 수 없어 랜덤으로 추천했어요
+                  </p>
+                )}
+
                 {/* Map */}
                 <div className="relative mb-5 h-48 w-full overflow-hidden rounded-2xl border border-hairline-soft">
                   <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
