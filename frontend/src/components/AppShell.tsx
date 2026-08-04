@@ -17,6 +17,7 @@ import { CurrentUser, getStoredUser, setStoredUser } from "@/lib/user";
 
 import { apiFetchJson, getImageUrl } from "@/lib/api";
 import { NotificationBell } from "@/components/NotificationBell";
+import BottomTabBar from "@/components/BottomTabBar";
 
 /* =========================================================
  * 사용자 응답
@@ -630,6 +631,9 @@ export default function AppShell({
           </aside>
         )}
       </div>
+
+      {/* 하단 탭바 (lg 미만) */}
+      <BottomTabBar />
     </div>
   );
 }
