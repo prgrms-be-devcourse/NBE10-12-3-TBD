@@ -12,6 +12,7 @@ import {
   Search,
   LogOut,
   Settings,
+  ArrowUp,
 } from "lucide-react";
 import { CurrentUser, getStoredUser, setStoredUser } from "@/lib/user";
 
@@ -335,6 +336,25 @@ export default function AppShell({
   const [searchQuery, setSearchQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  /* ---------------------------------------------------------
+   * 위로가기 버튼 표시 여부
+   * --------------------------------------------------------- */
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 400);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
   /* =========================================================
    * 로그인 상태 변경
    * ========================================================= */
@@ -527,7 +547,7 @@ export default function AppShell({
 
           {/* 알림 / 프로필 */}
 
-          <div className="ml-8 flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3 lg:ml-8">
             <NotificationBell />
 
             <div className="relative" ref={menuRef}>
@@ -634,6 +654,18 @@ export default function AppShell({
 
       {/* 하단 탭바 (lg 미만) */}
       <BottomTabBar />
+
+      {/* 위로가기 버튼 (스크롤 시 표시, 모바일은 탭바 위) */}
+      {showBackToTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="맨 위로"
+          className="fixed bottom-20 right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-hairline-soft bg-surface/80 text-ink shadow-lg backdrop-blur transition-colors hover:bg-surface lg:bottom-6"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </button>
+      )}
     </div>
   );
 }

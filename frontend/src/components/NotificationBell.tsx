@@ -162,7 +162,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-hairline-soft bg-surface shadow-lg animate-in fade-in-50 zoom-in-95">
+        <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 overflow-hidden rounded-xl border border-hairline-soft bg-surface shadow-lg animate-in fade-in-50 zoom-in-95">
           <div className="flex items-center justify-between border-b border-hairline-soft px-4 py-3">
             <p className="text-sm font-bold text-ink">알림</p>
             <span className="text-xs font-semibold text-muted">읽지 않음 {unreadCount}</span>
