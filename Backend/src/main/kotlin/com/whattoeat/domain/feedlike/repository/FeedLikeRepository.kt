@@ -34,9 +34,13 @@ interface FeedLikeRepository : JpaRepository<FeedLike, Long> {
         select distinct fl.feed.id
         from FeedLike fl
         where fl.user.id in :userIds
+          and fl.feed.id in :feedIds
         """,
     )
-    fun findFeedIdsLikedByUserIds(@Param("userIds") userIds: Collection<Long>): List<Long>
+    fun findFeedIdsLikedByUserIds(
+        @Param("userIds") userIds: Collection<Long>,
+        @Param("feedIds") feedIds: Collection<Long>,
+    ): List<Long>
 
     @Query(
         """

@@ -32,9 +32,13 @@ interface FollowRepository : JpaRepository<Follow, Long> {
     select distinct f.following.id
     from Follow f
     where f.follower.id in :followerIds
+      and f.following.id in :authorIds
 """,
     )
-    fun findFollowingIdsByFollowerIds(@Param("followerIds") followerIds: Collection<Long>): List<Long>
+    fun findFollowingIdsByFollowerIds(
+        @Param("followerIds") followerIds: Collection<Long>,
+        @Param("authorIds") authorIds: Collection<Long>,
+    ): List<Long>
 
     @Query(
         """

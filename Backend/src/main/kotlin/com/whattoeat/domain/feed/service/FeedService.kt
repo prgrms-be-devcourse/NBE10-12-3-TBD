@@ -143,11 +143,10 @@ import org.springframework.web.multipart.MultipartFile
                 .content
                 .map { it.following.id!! }
 
-        if (followingUserIds.isEmpty()) {
-            return Page.empty(pageable)
-        }
+        // 팔로잉 탭에는 내가 팔로우하는 사람들의 글뿐 아니라 내 글도 함께 노출한다.
+        val authorIds = (followingUserIds + userId).toHashSet()
 
-        val feeds = feedRepository.findByUser_IdInOrderByIdDesc(followingUserIds, pageable)
+        val feeds = feedRepository.findByUser_IdInOrderByIdDesc(authorIds, pageable)
         val feedContents = feeds.content
         val commentCounts = countCommentByFeedIds(feedContents)
         val likedFeedIds = findLikedFeedIds(userId, feedContents)
@@ -190,21 +189,25 @@ import org.springframework.web.multipart.MultipartFile
             return emptyList()
         }
 
+        val candidateIds = candidates.map { it.id!! }
+        val candidateAuthorIds = candidates.map { it.user.id!! }.toHashSet()
         val commentCounts = countCommentByFeedIds(candidates)
         val likedFeedIds = findLikedFeedIds(userId, candidates)
 
         // 내가 팔로우하는 사람들이 팔로우하는 사람(2차 팔로우)의 글, 그리고 그들이 좋아요한 글을 가산점 신호로 사용한다.
+        // 지금 후보(candidateAuthorIds)의 작성자인지만 필요하므로 팔로우 그래프 전체가 아니라 그 범위로 제한한다.
         val secondDegreeAuthorIds =
             if (followingUserIds.isEmpty()) {
                 emptySet()
             } else {
-                followRepository.findFollowingIdsByFollowerIds(followingUserIds).toHashSet()
+                followRepository.findFollowingIdsByFollowerIds(followingUserIds, candidateAuthorIds).toHashSet()
             }
         val likedByFollowingFeedIds =
             if (followingUserIds.isEmpty()) {
                 emptySet()
             } else {
-                feedLikeRepository.findFeedIdsLikedByUserIds(followingUserIds).toHashSet()
+                // 지금 후보(candidateIds)에 없는 글까지 조회할 필요가 없으므로 후보 범위로 제한한다.
+                feedLikeRepository.findFeedIdsLikedByUserIds(followingUserIds, candidateIds).toHashSet()
             }
 
         val ranked =
