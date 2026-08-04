@@ -514,6 +514,12 @@ export default function CreateListPage() {
       return;
     }
 
+    if (selectedRestaurants.length === 0) {
+      alert("식당을 한 개 이상 선택해주세요.");
+
+      return;
+    }
+
     setSaving(true);
 
     try {

@@ -839,6 +839,12 @@ export default function ListEditPage() {
       return;
     }
 
+    if (items.length === 0) {
+      showAlert("리스트에는 식당이 한 개 이상 필요합니다.");
+
+      return;
+    }
+
     setSaving(true);
 
     try {
