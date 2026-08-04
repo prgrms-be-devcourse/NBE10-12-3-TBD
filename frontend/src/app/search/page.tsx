@@ -279,7 +279,11 @@ function SearchPage() {
 
   const [loading, setLoading] = useState(false);
 
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() =>
+    process.env.NEXT_PUBLIC_KAKAO_JS_KEY
+      ? ""
+      : "NEXT_PUBLIC_KAKAO_JS_KEY가 설정되지 않았습니다. .env.local을 확인하세요.",
+  );
 
   const [hotPlaces, setHotPlaces] = useState<HotPlace[]>([]);
 
@@ -490,12 +494,9 @@ function SearchPage() {
     /**
      * 환경변수를 먼저 확인해야
      * appkey=undefined 스크립트가 생성되지 않음
+     * (키 누락 안내는 error state 초기값에서 처리)
      */
     if (!kakaoKey) {
-      setError(
-        "NEXT_PUBLIC_KAKAO_JS_KEY가 설정되지 않았습니다. .env.local을 확인하세요.",
-      );
-
       return;
     }
 
