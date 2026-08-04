@@ -49,7 +49,9 @@ class RecommendService(
 
         return when (request.sort) {
             RecommendSort.RANDOM -> filterByMoodScore(items, request.mood)
-            RecommendSort.DISTANCE -> items.sortedBy { it.distanceMeter ?: Int.MAX_VALUE }
+            // 거리순도 mood 필터를 먼저 적용한 뒤 거리 정렬 (mood+거리순 조합 일관성)
+            RecommendSort.DISTANCE -> filterByMoodScore(items, request.mood)
+                .sortedBy { it.distanceMeter ?: Int.MAX_VALUE }
         }
     }
 

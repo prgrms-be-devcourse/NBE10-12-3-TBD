@@ -189,6 +189,25 @@ class RecommendationServiceTest {
     }
 
     @Test
+    fun `DISTANCE + mood - mood 필터 적용 후 거리 정렬`() {
+        val result = recommendService.recommend(
+            request(
+                listOf(
+                    candidate("far-cafe", "카페 > 커피전문점", lat = 37.51, lng = 127.01),
+                    candidate("near-chicken", "음식점 > 치킨", lat = 37.5001, lng = 127.0001)
+                ),
+                sort = RecommendSort.DISTANCE,
+                lat = 37.5,
+                lng = 127.0,
+                mood = MoodTag.DATE
+            )
+        )
+
+        // 가깝지만 mood 불일치인 치킨은 제외되고, 멀어도 mood 일치인 카페만 남음
+        assertThat(result.map { it.kakaoPlaceId }).containsExactly("far-cafe")
+    }
+
+    @Test
     fun `DISTANCE인데 좌표 없으면 InvalidRecommendParameterException`() {
         assertThatThrownBy {
             recommendService.recommend(
