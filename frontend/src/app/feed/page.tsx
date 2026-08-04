@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import AppShell, { SidebarProfile, SidebarCard } from "@/components/AppShell";
 import { apiFetchJson, getImageUrl } from "@/lib/api";
+import { moodLabel } from "@/lib/mood";
 import { getStoredUser, setStoredUser } from "@/lib/user";
 import CommentModal from "@/components/CommentModal";
 
@@ -474,17 +475,24 @@ function FeedContent() {
                   </div>
                 )}
 
-                {/* Restaurant */}
-                {post.restaurantId && post.restaurantName && (
-                  <div className="mt-3">
-                    <Link
-                      href={`/restaurant/${post.restaurantId}`}
-                      className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-                    >
-                      🍴 {post.restaurantName}
-                    </Link>
+                {/* Restaurant + Mood */}
+                {(post.restaurantId && post.restaurantName) || post.moodTag ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {post.restaurantId && post.restaurantName && (
+                      <Link
+                        href={`/restaurant/${post.restaurantId}`}
+                        className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        🍴 {post.restaurantName}
+                      </Link>
+                    )}
+                    {post.moodTag && (
+                      <span className="inline-flex items-center rounded-full bg-tag-mood px-3 py-1 text-xs font-bold text-ink">
+                        {moodLabel(post.moodTag)}
+                      </span>
+                    )}
                   </div>
-                )}
+                ) : null}
 
                 {/* Actions */}
                 <div className="mt-4 flex items-center gap-5 border-t border-hairline-soft pt-3">

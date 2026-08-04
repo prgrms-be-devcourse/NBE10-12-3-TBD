@@ -14,6 +14,7 @@ import {
 
 import AppShell from "@/components/AppShell";
 import { apiFetchJson, getImageUrl } from "@/lib/api";
+import { moodLabel } from "@/lib/mood";
 import { buildListHref } from "@/lib/listNavigation";
 import { getStoredUser } from "@/lib/user";
 
@@ -961,6 +962,14 @@ export default function ProfilePage() {
                               </div>
                             )}
                           </div>
+
+                          {post.moodTag && (
+                            <div className="mb-2">
+                              <span className="inline-flex items-center rounded-full bg-tag-mood px-3 py-1 text-xs font-bold text-ink">
+                                {moodLabel(post.moodTag)}
+                              </span>
+                            </div>
+                          )}
 
                           <p className="text-sm leading-6 text-body">
                             {post.content}
