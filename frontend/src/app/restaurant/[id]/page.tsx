@@ -169,7 +169,7 @@ export default function RestaurantDetailPage() {
     >
       <div className="space-y-5">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-muted">
+        <nav className="flex flex-wrap items-center gap-2 text-sm text-muted">
           <Link href="/search" className="hover:text-primary">
             탐색
           </Link>

@@ -578,7 +578,11 @@ function SearchPage() {
 
   const [loading, setLoading] = useState(false);
 
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() =>
+    process.env.NEXT_PUBLIC_KAKAO_JS_KEY
+      ? ""
+      : "NEXT_PUBLIC_KAKAO_JS_KEY가 설정되지 않았습니다. .env.local을 확인하세요.",
+  );
 
   const [hotPlaces, setHotPlaces] = useState<HotPlace[]>([]);
 
@@ -797,12 +801,9 @@ function SearchPage() {
     /**
      * 환경변수를 먼저 확인해야
      * appkey=undefined 스크립트가 생성되지 않음
+     * (키 누락 안내는 error state 초기값에서 처리)
      */
     if (!kakaoKey) {
-      setError(
-        "NEXT_PUBLIC_KAKAO_JS_KEY가 설정되지 않았습니다. .env.local을 확인하세요.",
-      );
-
       return;
     }
 
@@ -960,6 +961,28 @@ function SearchPage() {
 
     loadHotPlaces();
   }, []);
+
+  /**
+   * 번호 마커 클릭 시 결과 목록의 해당 항목으로 스크롤.
+   * 데스크톱 패널/모바일 시트 중 실제로 보이는 쪽의 항목을 찾는다.
+   */
+  const scrollToPlace = (placeId: string) => {
+    const containers = [listContainerRef.current, mobileListContainerRef.current];
+
+    for (const container of containers) {
+      if (!container) continue;
+
+      const element = container.querySelector<HTMLElement>(
+        `[data-place-id="${placeId}"]`,
+      );
+
+      if (element && element.offsetParent !== null) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+  };
+
 
   /**
    * 검색 결과가 바뀌면
@@ -2357,27 +2380,6 @@ function SearchPage() {
         : `${trimmedQuery} ${activeCategory}`;
 
     await fetchKeywordSearch(searchKeyword);
-  };
-
-  /**
-   * 번호 마커 클릭 시 결과 목록의 해당 항목으로 스크롤.
-   * 데스크톱 패널/모바일 시트 중 실제로 보이는 쪽의 항목을 찾는다.
-   */
-  const scrollToPlace = (placeId: string) => {
-    const containers = [listContainerRef.current, mobileListContainerRef.current];
-
-    for (const container of containers) {
-      if (!container) continue;
-
-      const element = container.querySelector<HTMLElement>(
-        `[data-place-id="${placeId}"]`,
-      );
-
-      if (element && element.offsetParent !== null) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
-    }
   };
 
   /**
