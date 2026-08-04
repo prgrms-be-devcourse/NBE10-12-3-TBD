@@ -18,6 +18,7 @@ import {
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 
 import { apiFetchJson } from "@/lib/api";
+import { MOOD_TAGS } from "@/lib/mood";
 import { buildListHref } from "@/lib/listNavigation";
 
 /* =========================================================
@@ -126,10 +127,10 @@ interface RestaurantResponse {
 }
 
 /* =========================================================
- * 분위기
+ * 분위기 — 공용 MOOD_TAGS 사용 (백엔드 enum 6종과 동일)
  * ========================================================= */
 
-const moodTags = ["SOLO", "DATE", "FAMILY", "HEALING"];
+const moodTags = MOOD_TAGS;
 
 /* =========================================================
  * 음식점 / 카페만 남김
@@ -1075,8 +1076,8 @@ export default function ListEditPage() {
                     className="w-full rounded-xl border border-hairline bg-surface-soft px-4 py-3 text-sm outline-none focus:border-primary"
                   >
                     {moodTags.map((tag) => (
-                      <option key={tag} value={tag}>
-                        {tag}
+                      <option key={tag.value} value={tag.value}>
+                        {tag.label}
                       </option>
                     ))}
                   </select>

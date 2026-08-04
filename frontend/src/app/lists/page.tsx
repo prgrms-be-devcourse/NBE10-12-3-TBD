@@ -7,6 +7,7 @@ import { Bookmark, MapPin, Pencil, Plus, Trash2, UserPlus, UserCheck } from "luc
 
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
+import { MOOD_TAGS, moodLabel, type MoodTagValue } from "@/lib/mood";
 import { parseListSearchParams, type ListTab } from "@/lib/listNavigation";
 
 /* =========================================================
@@ -218,6 +219,8 @@ function ListsPage() {
   const [popularError, setPopularError] = useState("");
 
   const [publicError, setPublicError] = useState("");
+
+  const [moodFilter, setMoodFilter] = useState<MoodTagValue | null>(null);
 
   const [savedError, setSavedError] = useState("");
 
@@ -443,7 +446,7 @@ function ListsPage() {
         ),
 
         request<RestaurantListsResponse>(
-          "/api/v1/lists/others?page=0&size=10",
+          `/api/v1/lists/others?page=0&size=10${moodFilter ? `&mood=${moodFilter}` : ""}`,
           "다른 사람 리스트 조회 오류:",
           "다른 사람 리스트를 불러오는 중 오류가 발생했습니다.",
         ),
@@ -662,7 +665,7 @@ function ListsPage() {
 
     try {
       const res = await apiFetchJson<RestaurantListsResponse>(
-        `/api/v1/lists/others?page=${nextPage}&size=10`,
+        `/api/v1/lists/others?page=${nextPage}&size=10${moodFilter ? `&mood=${moodFilter}` : ""}`,
       );
 
       if (!res.ok || !res.data) {
@@ -699,6 +702,32 @@ function ListsPage() {
   };
 
   /* =========================================================
+   * 다른 사람 리스트 mood 필터
+   * ========================================================= */
+
+  const handleMoodFilterChange = async (mood: MoodTagValue | null) => {
+    setMoodFilter(mood);
+    setPublicError("");
+
+    try {
+      const res = await apiFetchJson<RestaurantListsResponse>(
+        `/api/v1/lists/others?page=0&size=10${mood ? `&mood=${mood}` : ""}`,
+      );
+
+      if (res.ok && res.data) {
+        setPublicLists(res.data.lists);
+        setPublicPage(0);
+        setPublicTotalPages(res.data.totalPages);
+      } else {
+        setPublicError(res.message || "다른 사람 리스트를 불러오지 못했습니다.");
+      }
+    } catch (error) {
+      console.error("다른 사람 리스트 mood 필터 조회 실패:", error);
+      setPublicError("다른 사람 리스트를 불러오는 중 오류가 발생했습니다.");
+    }
+  };
+
+  /* =========================================================
    * 최초 로딩
    * ========================================================= */
 
@@ -725,6 +754,8 @@ function ListsPage() {
     };
 
     void load();
+    // 초기 마운트 시 1회만 로드하는 것이 의도 (loadLists는 매 렌더 새로 생성되므로 deps에 넣으면 반복 호출됨)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* =========================================================
@@ -1485,7 +1516,7 @@ function ListsPage() {
             </p>
 
             <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-              {list.moodTag}
+              {moodLabel(list.moodTag)}
             </span>
           </div>
 
@@ -1539,7 +1570,7 @@ function ListsPage() {
             </p>
 
             <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-              {list.moodTag}
+              {moodLabel(list.moodTag)}
             </span>
           </div>
 
@@ -1589,7 +1620,7 @@ function ListsPage() {
                           </p>
 
                           <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                            {list.moodTag}
+                            {moodLabel(list.moodTag)}
                           </span>
                         </div>
 
@@ -1627,7 +1658,7 @@ function ListsPage() {
                         </p>
 
                         <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                          {list.moodTag}
+                          {moodLabel(list.moodTag)}
                         </span>
                       </div>
 
@@ -1780,6 +1811,27 @@ function ListsPage() {
 
                 {activeTab === "other" && (
                   <>
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      {MOOD_TAGS.map((tag) => (
+                        <button
+                          key={tag.value}
+                          type="button"
+                          onClick={() =>
+                            void handleMoodFilterChange(
+                              moodFilter === tag.value ? null : tag.value,
+                            )
+                          }
+                          className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                            moodFilter === tag.value
+                              ? "bg-primary text-white"
+                              : "bg-surface-soft text-muted hover:bg-hairline-soft"
+                          }`}
+                        >
+                          {tag.label}
+                        </button>
+                      ))}
+                    </div>
+
                     {publicError && (
                       <p className="py-4 text-center text-sm text-red-500">
                         {publicError}
@@ -1828,7 +1880,7 @@ function ListsPage() {
                           </h3>
 
                           <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                            {selectedDetail.moodTag}
+                            {moodLabel(selectedDetail.moodTag)}
                           </span>
                         </div>
 
