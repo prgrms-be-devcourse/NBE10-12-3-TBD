@@ -8,35 +8,10 @@ import com.whattoeat.global.exception.RestaurantNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-import kotlin.random.Random
-
 @Service
 class RestaurantService (
     private val restaurantRepository: RestaurantRepository
 ) {
-    private val random = Random.Default
-
-    fun recommend(
-        category: Category?,
-        region1: String?,
-        region2: String?,
-        region3: String?,
-        region4: String?
-    ) : Restaurant {
-        val restaurants = restaurantRepository.findRecommended(
-            category,
-            region1,
-            region2,
-            region3,
-            region4
-        )
-
-        if (restaurants.isEmpty()) {
-            throw RestaurantNotFoundException("조건에 맞는 식당이 없습니다.");
-        }
-        return restaurants[random.nextInt(restaurants.size)];
-    }
-
     @Transactional(readOnly = true)
     fun findByKakaoPlaceId(kakaoPlaceId: String) : Restaurant {
         return restaurantRepository.findByKakaoPlaceId(kakaoPlaceId)

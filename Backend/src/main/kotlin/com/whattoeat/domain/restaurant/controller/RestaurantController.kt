@@ -2,7 +2,6 @@ package com.whattoeat.domain.restaurant.controller;
 
 import com.whattoeat.domain.restaurant.dto.RestaurantRequest;
 import com.whattoeat.domain.restaurant.dto.RestaurantResponse;
-import com.whattoeat.domain.restaurant.entity.Category;
 import com.whattoeat.domain.restaurant.service.RestaurantService;
 import com.whattoeat.domain.restaurant.service.TodayHotPlaceService;
 import com.whattoeat.global.rsData.RsData;
@@ -22,30 +21,6 @@ class RestaurantController(
         val data = todayHotPlaceService.getTodayHotPlaces()
             .map { RestaurantResponse.Recommend(it) }
         return RsData.success(data, "오늘의 핫플 조회가 완료되었습니다.")
-    }
-
-    //식당 추천조회
-    @GetMapping("/recommend")
-    fun recommend(
-            @RequestParam(required = false) category: Category?,
-            @RequestParam(required = false) region1: String?,
-            @RequestParam(required = false) region2: String?,
-            @RequestParam(required = false) region3: String?,
-            @RequestParam(required = false) region4: String?
-    ): RsData<RestaurantResponse.Recommend> {
-        val restaurant = RestaurantResponse.Recommend(
-                restaurantService.recommend(
-                    category,
-                    region1,
-                    region2,
-                    region3,
-                    region4
-                )
-        );
-        return RsData.success(
-            restaurant,
-            "식당 추천이 완료되었습니다."
-        )
     }
 
     // 식당 조회 (kakaoPlaceId로 단건 조회 or 전체 목록)
