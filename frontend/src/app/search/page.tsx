@@ -599,7 +599,7 @@ function SearchPage() {
   const [showResearchButton, setShowResearchButton] = useState(false);
 
   /** 모바일 결과 시트 스냅: 0=슬쩍, 1=반쯤, 2=전체 */
-  const [sheetSnap, setSheetSnap] = useState(1);
+  const [sheetSnap, setSheetSnap] = useState(0);
 
   /**
    * 검색, 현재 위치 이동처럼 코드가 지도를 움직이는 동안에는
@@ -2453,36 +2453,38 @@ function SearchPage() {
         </div>
       }
     >
-      {/* 모바일: 지도 위로 올린 검색창 + 카테고리 (lg 미만) */}
-      <div className="mb-3 rounded-2xl border border-hairline-soft bg-surface p-2 shadow-sm lg:hidden">
-        <SearchForm
-          mounted={mounted}
-          query={query}
-          loading={loading}
-          activeCategory={activeCategory}
-          onQueryChange={handleQueryChange}
-          onClear={handleClearQuery}
-          onSubmit={handleSubmit}
-          onCurrentLocation={handleCurrentLocation}
-          onCategoryChange={handleCategoryChange}
-        />
-      </div>
-
       <div className="search-map-viewport relative overflow-hidden rounded-2xl border border-hairline-soft lg:h-[calc(100vh-6.5rem)] lg:min-h-0">
         {/* 지도 */}
         <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
 
-        {/* 이 지역 다시 검색 — 데스크톱: 패널 오른쪽, 모바일: 지도 상단 중앙 */}
+        {/* 이 지역 다시 검색 — 데스크톱: 패널 오른쪽, 모바일: 검색창 아래 중앙 */}
         {showResearchButton && (
           <button
             type="button"
             onClick={handleResearchCurrentArea}
             disabled={loading}
-            className="absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-full border border-hairline-soft bg-white px-3 py-1 text-xs font-bold text-ink shadow-lg transition-all hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 lg:left-[calc(50%+200px)] lg:top-5"
+            className="absolute left-1/2 top-[7rem] z-30 -translate-x-1/2 rounded-full border border-hairline-soft bg-white px-3 py-1 text-xs font-bold text-ink shadow-lg transition-all hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 lg:left-[calc(50%+200px)] lg:top-5"
           >
             {loading ? "검색 중..." : "이 지역 다시 검색"}
           </button>
         )}
+
+        {/* 모바일: 지도 위에 뜨는 검색창 + 카테고리 (lg 미만) */}
+        <div className="absolute inset-x-3 top-2 z-20 lg:hidden">
+          <div className="rounded-2xl border border-hairline-soft bg-surface/95 p-2 shadow-lg backdrop-blur">
+            <SearchForm
+              mounted={mounted}
+              query={query}
+              loading={loading}
+              activeCategory={activeCategory}
+              onQueryChange={handleQueryChange}
+              onClear={handleClearQuery}
+              onSubmit={handleSubmit}
+              onCurrentLocation={handleCurrentLocation}
+              onCategoryChange={handleCategoryChange}
+            />
+          </div>
+        </div>
 
         {/* 데스크톱: 왼쪽 400px 패널 (lg 이상, 기존 모습 유지) */}
         <div className="absolute bottom-4 left-4 top-4 z-20 hidden w-[400px] lg:block">
