@@ -1022,7 +1022,8 @@ function SearchPage() {
         "aria-label",
         `${index + 1}번 ${restaurant.name}`,
       );
-      markerElement.dataset.placeId = restaurant.kakaoPlaceId;
+      // 호버 강조 대상은 지도 마커뿐이어야 하므로 목록 버튼의 data-place-id와 구분
+      markerElement.dataset.markerId = restaurant.kakaoPlaceId;
 
       markerElement.style.width = "34px";
       markerElement.style.height = "34px";
@@ -1116,14 +1117,14 @@ function SearchPage() {
        * 번호 마커에 식당 ID를 부여해서 검색
        */
       const markerElements = document.querySelectorAll<HTMLButtonElement>(
-        `[data-place-id="${restaurant.kakaoPlaceId}"]`,
+        `[data-marker-id="${restaurant.kakaoPlaceId}"]`,
       );
 
       const isActive = restaurant.kakaoPlaceId === hoveredPlaceId;
 
       /**
-       * 결과 목록이 데스크톱 패널과 모바일 시트에
-       * 중복 렌더링되므로 발견된 모든 요소에 스타일 적용
+       * 호버 강조는 지도 위 번호 마커에만 적용
+       * (목록 버튼은 data-place-id라 이 셀렉터에 안 걸림)
        */
       markerElements.forEach((markerElement) => {
         markerElement.style.transform = isActive
