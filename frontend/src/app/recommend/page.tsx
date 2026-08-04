@@ -401,6 +401,8 @@ export default function RecommendPage() {
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
         () => resolve(null),
+        // CoreLocation이 실패 콜백을 늦게 주는 환경에서 무한 대기하지 않도록
+        { timeout: 5000, maximumAge: 60000 },
       );
     });
 
@@ -410,22 +412,21 @@ export default function RecommendPage() {
     setDistanceFallback(false);
 
     try {
+      // 위치는 한 번만 요청 (거리순 폴 back 판단 + distanceMeter 계산에 공용)
+      const position = await getCurrentPosition();
+
       let effectiveSort = sortBy;
 
-      if (sortBy === "distance") {
-        const position = await getCurrentPosition();
-        if (!position) {
-          // 위치를 못 얻으면 에러 대신 랜덤으로 폴 back하고 안내 표시
-          effectiveSort = "random";
-          setDistanceFallback(true);
-        }
+      if (sortBy === "distance" && !position) {
+        // 위치를 못 얻으면 에러 대신 랜덤으로 폴 back하고 안내 표시
+        effectiveSort = "random";
+        setDistanceFallback(true);
       }
 
       // 큐에 아직 안 본 후보가 남아있으면 재요청 없이 소비
       let queue = queueRef.current.filter((r) => !seenIdsRef.current.has(r.kakaoPlaceId));
 
       if (queue.length === 0) {
-        const position = await getCurrentPosition();
         const keyword = buildSearchKeyword();
         const groupCode = selectedCategory === "카페" ? "CE7" : "FD6";
 
