@@ -1,8 +1,8 @@
 package com.whattoeat.domain.restaurant.service
 
 import com.whattoeat.domain.restaurant.dto.RestaurantRequest
-import com.whattoeat.domain.restaurant.entity.Category
 import com.whattoeat.domain.restaurant.entity.Restaurant
+import com.whattoeat.domain.restaurant.mapper.toCategory
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.global.exception.RestaurantNotFoundException
 import org.springframework.stereotype.Service
@@ -29,7 +29,7 @@ class RestaurantService (
                             Restaurant(
                                     request.kakaoPlaceId,
                             request.name,
-                            convertToCategory(request.categoryName),
+                            toCategory(request.categoryName),
                             request.address,
                             request.roadAddress,
                             defaultIfBlank(request.region1, "지역없음"),
@@ -42,21 +42,6 @@ class RestaurantService (
                         )
                     )
                 }
-    }
-
-    private fun convertToCategory(categoryName: String?) : Category{
-        val name = categoryName.orEmpty()
-
-        return when {
-            "한식" in name -> Category.KOREAN
-            "중식" in name -> Category.CHINESE
-            "일식" in name -> Category.JAPANESE
-            "양식" in name -> Category.WESTERN
-            "아시아음식" in name -> Category.ASIAN
-            "카페" in name || "디저트" in name -> Category.CAFE
-            "분식" in name -> Category.SNACK
-            else -> Category.ETC
-        }
     }
 
     private fun defaultIfBlank(
