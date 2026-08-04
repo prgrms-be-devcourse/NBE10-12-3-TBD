@@ -415,7 +415,7 @@ class RestaurantListControllerTest {
         )
 
         given(
-            restaurantListService.findAll(pageable)
+            restaurantListService.findAll(null, pageable)
         ).willReturn(
             PageImpl(
                 listOf(list2, list1),
@@ -465,6 +465,36 @@ class RestaurantListControllerTest {
                 jsonPath("$.message")
                     .value("전체 맛집 리스트 목록 조회가 완료되었습니다.")
             )
+    }
+
+    @Test
+    fun `getAllRestaurantLists - mood 필터로 조회`() {
+        val pageable = PageRequest.of(
+            0,
+            10,
+            Sort.by(Sort.Direction.DESC, "createdAt")
+        )
+
+        given(
+            restaurantListService.findAll(MoodTag.DATE, pageable)
+        ).willReturn(
+            PageImpl(emptyList(), pageable, 0)
+        )
+
+        mockMvc.perform(
+            get("/api/v1/lists/all")
+                .param("mood", "DATE")
+        )
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `getAllRestaurantLists - 잘못된 mood 값이면 400`() {
+        mockMvc.perform(
+            get("/api/v1/lists/all")
+                .param("mood", "INVALID")
+        )
+            .andExpect(status().isBadRequest)
     }
 
     @Test

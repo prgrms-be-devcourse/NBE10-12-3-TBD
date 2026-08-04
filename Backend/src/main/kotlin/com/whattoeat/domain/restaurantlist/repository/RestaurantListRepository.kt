@@ -1,6 +1,7 @@
 package com.whattoeat.domain.restaurantlist.repository
 
 import com.whattoeat.domain.restaurantlist.entity.RestaurantList
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
@@ -27,4 +28,8 @@ interface RestaurantListRepository : JpaRepository<RestaurantList, Long> {
     fun findByIdWithItems(@Param("id") id: Long?): Optional<RestaurantList>
 
     fun findByUserIdNot(userId: Long, pageable: Pageable): Page<RestaurantList>
+
+    fun findAllByMoodTag(moodTag: MoodTag, pageable: Pageable): Page<RestaurantList>
+
+    fun findByUserIdNotAndMoodTag(userId: Long, moodTag: MoodTag, pageable: Pageable): Page<RestaurantList>
 }

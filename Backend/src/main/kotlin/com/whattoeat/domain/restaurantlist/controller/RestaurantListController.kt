@@ -1,5 +1,6 @@
 package com.whattoeat.domain.restaurantlist.controller
 
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurantlist.dto.RestaurantListRequest
 import com.whattoeat.domain.restaurantlist.dto.RestaurantListResponse
 import com.whattoeat.domain.restaurantlist.service.RestaurantListService
@@ -213,11 +214,12 @@ class RestaurantListController (
     @Operation(summary = "전체 맛집 리스트 다건 조회")
     fun getAllRestaurantLists(
             @RequestParam(defaultValue = "0") page: Int,
-            @RequestParam(defaultValue = "10") size: Int
+            @RequestParam(defaultValue = "10") size: Int,
+            @RequestParam(required = false) mood: MoodTag?
     ) : RsData<RestaurantListResponse.RestaurantListsResponse> {
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
 
-        val result = restaurantListService.findAll(pageable)
+        val result = restaurantListService.findAll(mood, pageable)
 
         val lists = result.content.map { RestaurantListResponse.RestaurantLists(it) }
 
@@ -264,7 +266,8 @@ class RestaurantListController (
     fun getOtherRestaurantLists(
             @AuthenticationPrincipal userDetails: CustomUserDetails,
             @RequestParam(defaultValue = "0") page: Int,
-            @RequestParam(defaultValue = "10") size: Int
+            @RequestParam(defaultValue = "10") size: Int,
+            @RequestParam(required = false) mood: MoodTag?
     ) : RsData<RestaurantListResponse.RestaurantListsResponse> {
         val userId = userDetails.userId;
 
@@ -274,7 +277,7 @@ class RestaurantListController (
                 Sort.by(Sort.Direction.DESC, "createdAt")
         )
 
-        val result = restaurantListService.findAllExceptUser(userId, pageable)
+        val result = restaurantListService.findAllExceptUser(userId, mood, pageable)
 
         val lists =
                 result.content.map { RestaurantListResponse.RestaurantLists(it) }

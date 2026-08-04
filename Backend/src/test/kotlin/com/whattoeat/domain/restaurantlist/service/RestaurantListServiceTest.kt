@@ -873,4 +873,55 @@ class RestaurantListServiceTest {
 
         assertThat(result).isEmpty()
     }
+
+    @Test
+    fun `findAll - mood가 null이면 전체 조회`() {
+        val pageable = PageRequest.of(0, 10)
+        val page = PageImpl<RestaurantList>(emptyList(), pageable, 0)
+        given(restaurantListRepository.findAll(pageable)).willReturn(page)
+
+        val result = restaurantListService.findAll(null, pageable)
+
+        assertThat(result).isEqualTo(page)
+        then(restaurantListRepository).should().findAll(pageable)
+    }
+
+    @Test
+    fun `findAll - mood가 있으면 moodTag로 필터링`() {
+        val pageable = PageRequest.of(0, 10)
+        val page = PageImpl<RestaurantList>(emptyList(), pageable, 0)
+        given(restaurantListRepository.findAllByMoodTag(MoodTag.DATE, pageable))
+            .willReturn(page)
+
+        val result = restaurantListService.findAll(MoodTag.DATE, pageable)
+
+        assertThat(result).isEqualTo(page)
+        then(restaurantListRepository).should().findAllByMoodTag(MoodTag.DATE, pageable)
+    }
+
+    @Test
+    fun `findAllExceptUser - mood가 null이면 사용자 제외 전체 조회`() {
+        val pageable = PageRequest.of(0, 10)
+        val page = PageImpl<RestaurantList>(emptyList(), pageable, 0)
+        given(restaurantListRepository.findByUserIdNot(1L, pageable)).willReturn(page)
+
+        val result = restaurantListService.findAllExceptUser(1L, null, pageable)
+
+        assertThat(result).isEqualTo(page)
+        then(restaurantListRepository).should().findByUserIdNot(1L, pageable)
+    }
+
+    @Test
+    fun `findAllExceptUser - mood가 있으면 사용자 제외 + moodTag 필터링`() {
+        val pageable = PageRequest.of(0, 10)
+        val page = PageImpl<RestaurantList>(emptyList(), pageable, 0)
+        given(restaurantListRepository.findByUserIdNotAndMoodTag(1L, MoodTag.GROUP, pageable))
+            .willReturn(page)
+
+        val result = restaurantListService.findAllExceptUser(1L, MoodTag.GROUP, pageable)
+
+        assertThat(result).isEqualTo(page)
+        then(restaurantListRepository).should()
+            .findByUserIdNotAndMoodTag(1L, MoodTag.GROUP, pageable)
+    }
 }
