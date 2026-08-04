@@ -1,10 +1,13 @@
 package com.whattoeat.domain.feed.entity
 
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurant.entity.Restaurant
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.global.entity.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
@@ -45,6 +48,10 @@ class Feed protected constructor() : BaseEntity() {
 
      var imageUrl: String? = null
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mood_tag", length = 20)
+    var moodTag: MoodTag? = null
+
 
     constructor(
         user: User,
@@ -52,12 +59,14 @@ class Feed protected constructor() : BaseEntity() {
         content: String,
         imageUrl: String?,
         likeCount: Int?,
+        moodTag: MoodTag?,
     ) : this() {
         this.user = user
         this.restaurant = restaurant
         this.content = content
         this.imageUrl = imageUrl
         this.likeCount = likeCount ?: 0
+        this.moodTag = moodTag
     }
 
      fun update(content: String, restaurant: Restaurant?, imageUrl: String?) {
@@ -82,6 +91,7 @@ class Feed protected constructor() : BaseEntity() {
         private var content: String? = null
         private var imageUrl: String? = null
         private var likeCount: Int? = null
+        private var moodTag: MoodTag? = null
 
         fun user(user: User?): FeedBuilder = apply { this.user = user }
 
@@ -93,6 +103,8 @@ class Feed protected constructor() : BaseEntity() {
 
         fun likeCount(likeCount: Int?): FeedBuilder = apply { this.likeCount = likeCount }
 
+        fun moodTag(moodTag: MoodTag?): FeedBuilder = apply { this.moodTag = moodTag }
+
         fun build(): Feed =
             Feed(
                 user = requireNotNull(user),
@@ -100,6 +112,7 @@ class Feed protected constructor() : BaseEntity() {
                 content = requireNotNull(content),
                 imageUrl = imageUrl,
                 likeCount = likeCount,
+                moodTag = moodTag,
             )
     }
 

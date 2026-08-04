@@ -14,6 +14,8 @@ import {
 
 import AppShell from "@/components/AppShell";
 import { apiFetchJson, getImageUrl } from "@/lib/api";
+import { moodLabel } from "@/lib/mood";
+import { buildListHref } from "@/lib/listNavigation";
 import { getStoredUser } from "@/lib/user";
 
 const tabs = ["내 리스트", "포스트", "저장함"] as const;
@@ -82,6 +84,7 @@ interface FeedListPageResponse {
     createdAt: string;
     restaurantId?: number | null;
     restaurantName?: string | null;
+    moodTag?: string | null;
   }[];
 }
 
@@ -97,6 +100,11 @@ interface SavedList {
   moodTag: string;
   items: unknown[];
   savedAt: string;
+}
+
+interface SavedListsResponse {
+  content: SavedList[];
+  totalPages: number;
 }
 
 /* =========================================================
@@ -130,6 +138,8 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("내 리스트");
 
   const [tabLoading, setTabLoading] = useState(false);
+
+  const [tabError, setTabError] = useState("");
 
   useEffect(() => {
     const syncTabFromUrl = () => {
@@ -186,6 +196,12 @@ export default function ProfilePage() {
   const [listTotalPages, setListTotalPages] = useState(0);
 
   const [loadingMoreLists, setLoadingMoreLists] = useState(false);
+
+  const [savedPage, setSavedPage] = useState(0);
+
+  const [savedTotalPages, setSavedTotalPages] = useState(0);
+
+  const [loadingMoreSavedLists, setLoadingMoreSavedLists] = useState(false);
 
   /* =========================================================
    * 프로필 + 팔로우 수 조회
@@ -254,6 +270,7 @@ export default function ProfilePage() {
 
     const loadTab = async () => {
       setTabLoading(true);
+      setTabError("");
 
       try {
         /* =====================================================
@@ -284,11 +301,13 @@ export default function ProfilePage() {
               setListPage(0);
 
               setListTotalPages(0);
+
+              setTabError(res.message || "리스트를 불러오지 못했습니다.");
             }
           } else {
             /* 다른 사람 프로필 */
             const res = await apiFetchJson<ProfileListsResponse>(
-              "/api/v1/lists/all?page=0&size=10",
+              `/api/v1/lists/users/${targetUserId}?page=0&size=10`,
             );
 
             if (cancelled) {
@@ -296,11 +315,7 @@ export default function ProfilePage() {
             }
 
             if (res.ok && res.data) {
-              const targetUserLists = res.data.lists.filter(
-                (list) => list.userId === targetUserId,
-              );
-
-              setMyLists(targetUserLists);
+              setMyLists(res.data.lists);
 
               setListPage(0);
 
@@ -311,6 +326,8 @@ export default function ProfilePage() {
               setListPage(0);
 
               setListTotalPages(0);
+
+              setTabError(res.message || "리스트를 불러오지 못했습니다.");
             }
           }
         } else if (activeTab === "포스트") {
@@ -329,14 +346,15 @@ export default function ProfilePage() {
             setMyPosts(res.data.feeds);
           } else {
             setMyPosts([]);
+            setTabError(res.message || "포스트를 불러오지 못했습니다.");
           }
         } else if (activeTab === "저장함" && user.isOwnProfile) {
           /* =====================================================
            * 저장함
            * ===================================================== */
-          const res = await apiFetchJson<{
-            content: SavedList[];
-          }>("/api/v1/restaurant_lists/saved");
+          const res = await apiFetchJson<SavedListsResponse>(
+            "/api/v1/restaurant_lists/saved?page=0&size=10",
+          );
 
           if (cancelled) {
             return;
@@ -344,8 +362,15 @@ export default function ProfilePage() {
 
           if (res.ok && res.data) {
             setSavedLists(res.data.content ?? []);
+            setSavedPage(0);
+            setSavedTotalPages(res.data.totalPages);
           } else {
             setSavedLists([]);
+            setSavedPage(0);
+            setSavedTotalPages(0);
+            setTabError(
+              res.message || "저장한 리스트를 불러오지 못했습니다.",
+            );
           }
         }
       } catch (error) {
@@ -354,6 +379,8 @@ export default function ProfilePage() {
         }
 
         console.error("프로필 탭 조회 실패:", error);
+
+        setTabError("프로필 탭을 불러오는 중 오류가 발생했습니다.");
 
         if (activeTab === "내 리스트") {
           setMyLists([]);
@@ -369,6 +396,8 @@ export default function ProfilePage() {
 
         if (activeTab === "저장함") {
           setSavedLists([]);
+          setSavedPage(0);
+          setSavedTotalPages(0);
         }
       } finally {
         if (!cancelled) {
@@ -441,7 +470,7 @@ export default function ProfilePage() {
       /* 다른 사람 프로필 */
 
       const res = await apiFetchJson<ProfileListsResponse>(
-        `/api/v1/lists/all?page=${nextPage}&size=10`,
+        `/api/v1/lists/users/${targetUserId}?page=${nextPage}&size=10`,
       );
 
       if (!res.ok || !res.data) {
@@ -452,14 +481,10 @@ export default function ProfilePage() {
 
       const data = res.data;
 
-      const targetUserLists = data.lists.filter(
-        (list) => list.userId === targetUserId,
-      );
-
       setMyLists((prev) => {
         const existingIds = new Set(prev.map((list) => list.id));
 
-        const newLists = targetUserLists.filter(
+        const newLists = data.lists.filter(
           (list) => !existingIds.has(list.id),
         );
 
@@ -478,6 +503,52 @@ export default function ProfilePage() {
     }
   };
 
+  const loadMoreSavedLists = async () => {
+    if (loadingMoreSavedLists) {
+      return;
+    }
+
+    const nextPage = savedPage + 1;
+
+    if (nextPage >= savedTotalPages) {
+      return;
+    }
+
+    setLoadingMoreSavedLists(true);
+
+    try {
+      const res = await apiFetchJson<SavedListsResponse>(
+        `/api/v1/restaurant_lists/saved?page=${nextPage}&size=10`,
+      );
+
+      if (!res.ok || !res.data) {
+        alert(res.message || "다음 저장 리스트를 불러오지 못했습니다.");
+
+        return;
+      }
+
+      const data = res.data;
+
+      setSavedLists((prev) => {
+        const existingIds = new Set(prev.map((list) => list.listId));
+        const newLists = data.content.filter(
+          (list) => !existingIds.has(list.listId),
+        );
+
+        return [...prev, ...newLists];
+      });
+
+      setSavedPage(nextPage);
+      setSavedTotalPages(data.totalPages);
+    } catch (requestError) {
+      console.error("프로필 저장 리스트 추가 조회 실패:", requestError);
+
+      alert("다음 저장 리스트를 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setLoadingMoreSavedLists(false);
+    }
+  };
+
   const handleEditFeed = (post: FeedListPageResponse["feeds"][number]) => {
     sessionStorage.setItem(
       "editingFeed",
@@ -486,6 +557,7 @@ export default function ProfilePage() {
         content: post.content,
         restaurantId: post.restaurantId,
         restaurantName: post.restaurantName,
+        moodTag: post.moodTag ?? null,
         imageUrl: post.imageUrl,
         returnUrl: `${window.location.pathname}${window.location.search}`,
       }),
@@ -749,6 +821,12 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
+              {tabError && (
+                <p className="py-4 text-center text-sm text-red-500">
+                  {tabError}
+                </p>
+              )}
+
               {/* =================================================
                * 리스트
                * ================================================= */}
@@ -756,16 +834,21 @@ export default function ProfilePage() {
               {activeTab === "내 리스트" && (
                 <>
                   {myLists.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-muted">
-                      등록된 리스트가 없습니다.
-                    </p>
+                    !tabError && (
+                      <p className="py-10 text-center text-sm text-muted">
+                        등록된 리스트가 없습니다.
+                      </p>
+                    )
                   ) : (
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">
                         {myLists.map((list) => (
                           <Link
                             key={list.id}
-                            href={`/lists?selected=${list.id}`}
+                            href={buildListHref(
+                              list.id,
+                              user.isOwnProfile ? "my" : "other",
+                            )}
                             className="overflow-hidden rounded-2xl border border-hairline-soft bg-surface shadow-sm transition-colors hover:border-primary/30"
                           >
                             <div className="h-36 bg-surface-strong">
@@ -821,9 +904,11 @@ export default function ProfilePage() {
               {activeTab === "포스트" && (
                 <>
                   {myPosts.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-muted">
-                      작성한 포스트가 없습니다.
-                    </p>
+                    !tabError && (
+                      <p className="py-10 text-center text-sm text-muted">
+                        작성한 포스트가 없습니다.
+                      </p>
+                    )
                   ) : (
                     <div className="space-y-4">
                       {myPosts.map((post) => (
@@ -878,6 +963,14 @@ export default function ProfilePage() {
                             )}
                           </div>
 
+                          {post.moodTag && (
+                            <div className="mb-2">
+                              <span className="inline-flex items-center rounded-full bg-tag-mood px-3 py-1 text-xs font-bold text-ink">
+                                {moodLabel(post.moodTag)}
+                              </span>
+                            </div>
+                          )}
+
                           <p className="text-sm leading-6 text-body">
                             {post.content}
                           </p>
@@ -916,46 +1009,62 @@ export default function ProfilePage() {
                       다른 사용자의 저장함은 볼 수 없습니다.
                     </p>
                   ) : savedLists.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-muted">
-                      저장한 리스트가 없습니다.
-                    </p>
+                    !tabError && (
+                      <p className="py-10 text-center text-sm text-muted">
+                        저장한 리스트가 없습니다.
+                      </p>
+                    )
                   ) : (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {savedLists.map((list) => (
-                        <div
-                          key={list.listId}
-                          className="overflow-hidden rounded-2xl border border-hairline-soft bg-surface shadow-sm"
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {savedLists.map((list) => (
+                          <Link
+                            key={list.listId}
+                            href={buildListHref(list.listId, "saved")}
+                            className="overflow-hidden rounded-2xl border border-hairline-soft bg-surface shadow-sm transition-colors hover:border-primary/30"
+                          >
+                            <div className="h-36 bg-surface-strong">
+                              <img
+                                src="/list-placeholder.png"
+                                alt={list.title}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+
+                            <div className="p-4">
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="truncate text-base font-bold text-ink">
+                                  {list.title}
+                                </h3>
+
+                                <span className="shrink-0 rounded-full bg-tag-mood px-2 py-0.5 text-[10px] font-bold text-ink">
+                                  {list.moodTag}
+                                </span>
+                              </div>
+
+                              <p className="mt-1 text-xs text-muted">
+                                by {list.nickname}
+                              </p>
+
+                              <div className="mt-2 text-xs text-muted-soft">
+                                <span>식당 {list.items.length}개</span>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+
+                      {savedPage + 1 < savedTotalPages && (
+                        <button
+                          type="button"
+                          onClick={() => void loadMoreSavedLists()}
+                          disabled={loadingMoreSavedLists}
+                          className="mt-4 w-full rounded-xl border border-hairline-soft bg-surface px-4 py-3 text-sm font-bold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <div className="h-36 bg-surface-strong">
-                            <img
-                              src="/list-placeholder.png"
-                              alt={list.title}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-
-                          <div className="p-4">
-                            <div className="flex items-center justify-between gap-2">
-                              <h3 className="truncate text-base font-bold text-ink">
-                                {list.title}
-                              </h3>
-
-                              <span className="shrink-0 rounded-full bg-tag-mood px-2 py-0.5 text-[10px] font-bold text-ink">
-                                {list.moodTag}
-                              </span>
-                            </div>
-
-                            <p className="mt-1 text-xs text-muted">
-                              by {list.nickname}
-                            </p>
-
-                            <div className="mt-2 text-xs text-muted-soft">
-                              <span>식당 {list.items.length}개</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          {loadingMoreSavedLists ? "불러오는 중..." : "더보기"}
+                        </button>
+                      )}
+                    </>
                   )}
                 </>
               )}

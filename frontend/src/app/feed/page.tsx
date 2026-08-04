@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import AppShell, { SidebarProfile, SidebarCard } from "@/components/AppShell";
 import { apiFetchJson, getImageUrl } from "@/lib/api";
+import { moodLabel } from "@/lib/mood";
 import { getStoredUser, setStoredUser } from "@/lib/user";
 import CommentModal from "@/components/CommentModal";
 
@@ -29,6 +30,7 @@ interface Feed {
   commentCount: number;
   restaurantId: number | null;
   restaurantName: string | null;
+  moodTag?: string | null;
   createdAt: string;
 }
 
@@ -313,6 +315,7 @@ function FeedContent() {
         content: post.content,
         restaurantId: post.restaurantId,
         restaurantName: post.restaurantName,
+        moodTag: post.moodTag ?? null,
         imageUrl: post.imageUrl,
         returnUrl: `${window.location.pathname}${window.location.search}`,
       }),
@@ -341,6 +344,10 @@ function FeedContent() {
   };
 
   const handleTabChange = (tab: "following" | "recommended") => {
+    if (activeTab === tab) {
+      return;
+    }
+
     setPage(0);
     setPosts([]);
     setRecommendCursor(null);
@@ -385,7 +392,9 @@ function FeedContent() {
                       className="flex items-center gap-3"
                     >
                       <img
-                        src={getImageUrl(f.profileImage) ?? "/default-profile.png"}
+                        src={
+                          getImageUrl(f.profileImage) ?? "/default-profile.png"
+                        }
                         alt=""
                         className="h-10 w-10 rounded-full object-cover"
                       />
@@ -469,7 +478,9 @@ function FeedContent() {
                     className="flex items-center gap-3 group"
                   >
                     <img
-                      src={getImageUrl(post.profileImage) ?? "/default-profile.png"}
+                      src={
+                        getImageUrl(post.profileImage) ?? "/default-profile.png"
+                      }
                       alt=""
                       className="h-10 w-10 rounded-full object-cover ring-1 ring-hairline-soft"
                     />
@@ -544,17 +555,24 @@ function FeedContent() {
                   </div>
                 )}
 
-                {/* Restaurant */}
-                {post.restaurantId && post.restaurantName && (
-                  <div className="mt-3">
-                    <Link
-                      href={`/restaurant/${post.restaurantId}`}
-                      className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-                    >
-                      🍴 {post.restaurantName}
-                    </Link>
+                {/* Restaurant + Mood */}
+                {(post.restaurantId && post.restaurantName) || post.moodTag ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {post.restaurantId && post.restaurantName && (
+                      <Link
+                        href={`/restaurant/${post.restaurantId}`}
+                        className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        🍴 {post.restaurantName}
+                      </Link>
+                    )}
+                    {post.moodTag && (
+                      <span className="inline-flex items-center rounded-full bg-tag-mood px-3 py-1 text-xs font-bold text-ink">
+                        {moodLabel(post.moodTag)}
+                      </span>
+                    )}
                   </div>
-                )}
+                ) : null}
 
                 {/* Actions */}
                 <div className="mt-4 flex items-center gap-5 border-t border-hairline-soft pt-3">

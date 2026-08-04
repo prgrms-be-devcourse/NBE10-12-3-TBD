@@ -1,9 +1,12 @@
 package com.whattoeat.domain.restaurantlist.repository
 
+import com.whattoeat.domain.feed.repository.MoodVoteCount
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurantlist.entity.RestaurantListItem
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 
 import java.util.Optional
 
@@ -43,4 +46,12 @@ interface RestaurantListItemRepository : JpaRepository<RestaurantListItem, Long>
          order by item.orderIndex asc
     """)
     fun findItemsByListId(listId: Long): List<RestaurantListItem>
+
+    @Query("SELECT li.restaurant.id AS restaurantId, COUNT(li) AS voteCount FROM RestaurantListItem li " +
+            "WHERE li.restaurantList.moodTag = :mood AND li.restaurant.id IN :restaurantIds " +
+            "GROUP BY li.restaurant.id")
+    fun countMoodVotes(
+        @Param("mood") mood: MoodTag,
+        @Param("restaurantIds") restaurantIds: List<Long>
+    ): List<MoodVoteCount>
 }

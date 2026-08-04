@@ -415,7 +415,7 @@ class RestaurantListControllerTest {
         )
 
         given(
-            restaurantListService.findAll(pageable)
+            restaurantListService.findAll(null, pageable)
         ).willReturn(
             PageImpl(
                 listOf(list2, list1),
@@ -465,6 +465,91 @@ class RestaurantListControllerTest {
                 jsonPath("$.message")
                     .value("전체 맛집 리스트 목록 조회가 완료되었습니다.")
             )
+    }
+
+    @Test
+    fun `getAllRestaurantLists - mood 필터로 조회`() {
+        val pageable = PageRequest.of(
+            0,
+            10,
+            Sort.by(Sort.Direction.DESC, "createdAt")
+        )
+
+        given(
+            restaurantListService.findAll(MoodTag.DATE, pageable)
+        ).willReturn(
+            PageImpl(emptyList(), pageable, 0)
+        )
+
+        mockMvc.perform(
+            get("/api/v1/lists/all")
+                .param("mood", "DATE")
+        )
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `getAllRestaurantLists - 잘못된 mood 값이면 400`() {
+        mockMvc.perform(
+            get("/api/v1/lists/all")
+                .param("mood", "INVALID")
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `특정 사용자의 공개 맛집리스트를 페이지로 조회한다`() {
+        val targetUser = mockUser(
+            id = 2L,
+            nickname = "user2"
+        )
+        val restaurantList = createRestaurantList(
+            id = 3L,
+            user = targetUser,
+            title = "user2 맛집",
+            description = "공개 리스트",
+            moodTag = MoodTag.FRIENDS
+        )
+        val pageable = PageRequest.of(
+            1,
+            5,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
+
+        given(
+            restaurantListService.findPublicByUserId(
+                2L,
+                pageable
+            )
+        ).willReturn(
+            PageImpl(
+                listOf(restaurantList),
+                pageable,
+                6L
+            )
+        )
+
+        SecurityContextHolder.clearContext()
+
+        mockMvc.perform(
+            get("/api/v1/lists/users/2")
+                .param("page", "1")
+                .param("size", "5")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.lists.length()").value(1))
+            .andExpect(jsonPath("$.data.lists[0].id").value(3L))
+            .andExpect(jsonPath("$.data.lists[0].userId").value(2L))
+            .andExpect(jsonPath("$.data.totalPages").value(2))
+            .andExpect(jsonPath("$.data.totalElements").value(6L))
+
+        then(restaurantListService)
+            .should()
+            .findPublicByUserId(2L, pageable)
     }
 
     @Test

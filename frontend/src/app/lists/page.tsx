@@ -3,10 +3,20 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Bookmark, MapPin, Pencil, Plus, Trash2, UserPlus, UserCheck } from "lucide-react";
+import {
+  Bookmark,
+  MapPin,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+  UserCheck,
+} from "lucide-react";
 
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
+import { MOOD_TAGS, moodLabel, type MoodTagValue } from "@/lib/mood";
+import { parseListSearchParams, type ListTab } from "@/lib/listNavigation";
 
 /* =========================================================
  * 리스트 목록
@@ -39,6 +49,11 @@ interface PopularListSummary extends ListSummary {
 
 interface PopularRestaurantListsResponse {
   lists: PopularListSummary[];
+}
+
+interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
 }
 
 /* =========================================================
@@ -111,12 +126,6 @@ interface KakaoMapsWithPolyline {
 }
 
 /* =========================================================
- * 탭
- * ========================================================= */
-
-type ListTab = "my" | "saved" | "other";
-
-/* =========================================================
  * 확인창 작업 종류
  * ========================================================= */
 
@@ -126,9 +135,16 @@ type ConfirmAction =
       item: ListItem;
     }
   | {
+      type: "deleteList";
+      listId: number;
+    }
+  | {
       type: "unsave";
     }
   | null;
+
+const KAKAO_MAP_RETRY_INTERVAL_MS = 200;
+const KAKAO_MAP_DEADLINE_MS = 10_000;
 
 /* =========================================================
  * 페이지
@@ -149,6 +165,16 @@ function ListsPage() {
   const [popularLists, setPopularLists] = useState<PopularListSummary[]>([]);
 
   const [savedLists, setSavedLists] = useState<SavedListDetail[]>([]);
+
+  /* ---------------------------------------------------------
+   * 저장한 리스트 페이징
+   * --------------------------------------------------------- */
+
+  const [savedPage, setSavedPage] = useState(0);
+
+  const [savedTotalPages, setSavedTotalPages] = useState(0);
+
+  const [loadingMoreSavedLists, setLoadingMoreSavedLists] = useState(false);
 
   /* ---------------------------------------------------------
    * 내 리스트 페이징
@@ -174,16 +200,20 @@ function ListsPage() {
    * 현재 탭
    * --------------------------------------------------------- */
 
-  const [activeTab, setActiveTab] = useState<ListTab>("my");
+  const initialLocation = parseListSearchParams(searchParams);
+
+  const initialSelectedId = initialLocation.selectedId;
+
+  const initialTab = initialLocation.tab;
+
+  const [activeTab, setActiveTab] = useState<ListTab>(initialTab);
 
   /* ---------------------------------------------------------
    * 선택한 리스트
    * --------------------------------------------------------- */
 
-  const initialSelectedParam = searchParams.get("selected");
-
   const [selectedId, setSelectedId] = useState<number | null>(
-    initialSelectedParam ? Number(initialSelectedParam) : null,
+    initialSelectedId,
   );
 
   const [selectedDetail, setSelectedDetail] = useState<
@@ -199,6 +229,14 @@ function ListsPage() {
   const [error, setError] = useState("");
 
   const [popularError, setPopularError] = useState("");
+
+  const [publicError, setPublicError] = useState("");
+
+  const [moodFilter, setMoodFilter] = useState<MoodTagValue | null>(null);
+
+  const [savedError, setSavedError] = useState("");
+
+  const [detailError, setDetailError] = useState("");
 
   const [mapError, setMapError] = useState("");
 
@@ -232,9 +270,23 @@ function ListsPage() {
 
   const initialized = useRef(false);
 
+  const latestLocationRef = useRef(initialLocation);
+
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const alertCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const confirmCancelButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const dialogBackgroundRef = useRef<HTMLDivElement | null>(null);
+
+  const alertPreviousFocusRef = useRef<HTMLElement | null>(null);
+
+  const confirmPreviousFocusRef = useRef<HTMLElement | null>(null);
 
   /* =========================================================
    * 알림창 열기
@@ -245,6 +297,162 @@ function ListsPage() {
     setAlertOpen(true);
   };
 
+  useEffect(() => {
+    latestLocationRef.current = {
+      selectedId: initialSelectedId,
+      tab: initialTab,
+    };
+
+    const syncFrame = window.requestAnimationFrame(() => {
+      setActiveTab(initialTab);
+      setSelectedId(initialSelectedId);
+      setSelectedDetail(null);
+      setMapError("");
+      setDetailError("");
+    });
+
+    return () => {
+      window.cancelAnimationFrame(syncFrame);
+    };
+  }, [initialSelectedId, initialTab]);
+
+  const modalOpen = alertOpen || confirmAction !== null;
+
+  useEffect(() => {
+    if (!modalOpen || !dialogBackgroundRef.current) {
+      return;
+    }
+
+    const background = dialogBackgroundRef.current;
+    background.inert = true;
+
+    return () => {
+      background.inert = false;
+    };
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (!alertOpen) {
+      return;
+    }
+
+    alertPreviousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      alertCloseButtonRef.current?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Tab") {
+        event.preventDefault();
+        alertCloseButtonRef.current?.focus();
+
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setAlertOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+      alertPreviousFocusRef.current?.focus();
+      alertPreviousFocusRef.current = null;
+    };
+  }, [alertOpen]);
+
+  useEffect(() => {
+    if (confirmAction === null) {
+      return;
+    }
+
+    confirmPreviousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      confirmCancelButtonRef.current?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Tab") {
+        const buttons = [
+          confirmCancelButtonRef.current,
+          confirmButtonRef.current,
+        ].filter(
+          (button): button is HTMLButtonElement =>
+            button !== null && !button.disabled,
+        );
+
+        event.preventDefault();
+
+        if (buttons.length > 0) {
+          const currentIndex = buttons.indexOf(
+            document.activeElement as HTMLButtonElement,
+          );
+          const nextIndex = event.shiftKey
+            ? (currentIndex - 1 + buttons.length) % buttons.length
+            : (currentIndex + 1) % buttons.length;
+
+          buttons[currentIndex === -1 ? 0 : nextIndex].focus();
+        }
+
+        return;
+      }
+
+      if (
+        event.key === "Escape" &&
+        !confirmCancelButtonRef.current?.disabled
+      ) {
+        event.preventDefault();
+        setConfirmAction(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+      confirmPreviousFocusRef.current?.focus();
+      confirmPreviousFocusRef.current = null;
+    };
+  }, [confirmAction]);
+
+  /* =========================================================
+   * 인기 리스트만 불러오기
+   * ========================================================= */
+
+  const loadPopularLists = async () => {
+    try {
+      const res = await apiFetchJson<PopularRestaurantListsResponse>(
+        "/api/v1/lists/popular?size=5",
+      );
+
+      if (res.ok && res.data) {
+        setPopularLists(res.data.lists);
+        setPopularError("");
+      } else {
+        setPopularLists([]);
+        setPopularError(res.message || "인기 리스트를 불러오지 못했습니다.");
+      }
+    } catch (error) {
+      console.error("인기 리스트 조회 실패:", error);
+
+      setPopularLists([]);
+      setPopularError("인기 리스트를 불러오는 중 오류가 발생했습니다.");
+    }
+  };
+
   /* =========================================================
    * 리스트 목록 불러오기
    * ========================================================= */
@@ -253,20 +461,44 @@ function ListsPage() {
     try {
       setError("");
 
+      const request = async <T,>(
+        path: string,
+        context: string,
+        fallbackMessage: string,
+      ): Promise<{ ok: boolean; data?: T; message?: string }> => {
+        try {
+          return await apiFetchJson<T>(path);
+        } catch (requestError) {
+          console.error(context, requestError);
+
+          return { ok: false, message: fallbackMessage };
+        }
+      };
+
       const [myRes, publicRes, popularRes, savedRes] = await Promise.all([
-        apiFetchJson<RestaurantListsResponse>("/api/v1/lists?page=0&size=10"),
-
-        apiFetchJson<RestaurantListsResponse>(
-          "/api/v1/lists/others?page=0&size=10",
+        request<RestaurantListsResponse>(
+          "/api/v1/lists?page=0&size=10",
+          "내 리스트 조회 오류:",
+          "내 리스트를 불러오는 중 오류가 발생했습니다.",
         ),
 
-        apiFetchJson<PopularRestaurantListsResponse>(
+        request<RestaurantListsResponse>(
+          `/api/v1/lists/others?page=0&size=10${moodFilter ? `&mood=${moodFilter}` : ""}`,
+          "다른 사람 리스트 조회 오류:",
+          "다른 사람 리스트를 불러오는 중 오류가 발생했습니다.",
+        ),
+
+        request<PopularRestaurantListsResponse>(
           "/api/v1/lists/popular?size=5",
+          "인기 리스트 조회 오류:",
+          "인기 리스트를 불러오는 중 오류가 발생했습니다.",
         ),
 
-        apiFetchJson<{
-          content: SavedListDetail[];
-        }>("/api/v1/restaurant_lists/saved"),
+        request<PageResponse<SavedListDetail>>(
+          "/api/v1/restaurant_lists/saved?page=0&size=10",
+          "저장한 리스트 조회 오류:",
+          "저장한 리스트를 불러오는 중 오류가 발생했습니다.",
+        ),
       ]);
 
       let my: ListSummary[] = [];
@@ -279,6 +511,7 @@ function ListsPage() {
         setMyLists(my);
         setMyPage(0);
         setMyTotalPages(myRes.data.totalPages);
+        setError("");
       } else {
         setMyLists([]);
         setMyPage(0);
@@ -293,10 +526,14 @@ function ListsPage() {
         setPublicLists(publicRes.data.lists);
         setPublicPage(0);
         setPublicTotalPages(publicRes.data.totalPages);
+        setPublicError("");
       } else {
         setPublicLists([]);
         setPublicPage(0);
         setPublicTotalPages(0);
+        setPublicError(
+          publicRes.message || "다른 사람 리스트를 불러오지 못했습니다.",
+        );
       }
 
       /* 인기 리스트 */
@@ -315,8 +552,16 @@ function ListsPage() {
 
       if (savedRes.ok && savedRes.data) {
         setSavedLists(savedRes.data.content ?? []);
+        setSavedPage(0);
+        setSavedTotalPages(savedRes.data.totalPages);
+        setSavedError("");
       } else {
         setSavedLists([]);
+        setSavedPage(0);
+        setSavedTotalPages(0);
+        setSavedError(
+          savedRes.message || "저장한 리스트를 불러오지 못했습니다.",
+        );
       }
 
       return my;
@@ -379,6 +624,65 @@ function ListsPage() {
   };
 
   /* =========================================================
+   * 저장한 리스트 더보기
+   * ========================================================= */
+
+  const loadMoreSavedLists = async () => {
+    if (loadingMoreSavedLists) {
+      return;
+    }
+
+    const nextPage = savedPage + 1;
+
+    if (nextPage >= savedTotalPages) {
+      return;
+    }
+
+    setLoadingMoreSavedLists(true);
+    setSavedError("");
+
+    try {
+      const res = await apiFetchJson<PageResponse<SavedListDetail>>(
+        `/api/v1/restaurant_lists/saved?page=${nextPage}&size=10`,
+      );
+
+      if (!res.ok || !res.data) {
+        const message =
+          res.message || "다음 저장 리스트를 불러오지 못했습니다.";
+
+        setSavedError(message);
+        showAlert(message);
+
+        return;
+      }
+
+      const data = res.data;
+
+      setSavedLists((prev) => {
+        const existingIds = new Set(prev.map((list) => list.listId));
+        const newLists = data.content.filter(
+          (list) => !existingIds.has(list.listId),
+        );
+
+        return [...prev, ...newLists];
+      });
+
+      setSavedPage(nextPage);
+      setSavedTotalPages(data.totalPages);
+    } catch (requestError) {
+      console.error("저장한 리스트 추가 조회 오류:", requestError);
+
+      const message =
+        "다음 저장 리스트를 불러오는 중 오류가 발생했습니다.";
+
+      setSavedError(message);
+      showAlert(message);
+    } finally {
+      setLoadingMoreSavedLists(false);
+    }
+  };
+
+  /* =========================================================
    * 다른 사람 리스트 더보기
    * ========================================================= */
 
@@ -394,14 +698,18 @@ function ListsPage() {
     }
 
     setLoadingMorePublicLists(true);
+    setPublicError("");
 
     try {
       const res = await apiFetchJson<RestaurantListsResponse>(
-        `/api/v1/lists/others?page=${nextPage}&size=10`,
+        `/api/v1/lists/others?page=${nextPage}&size=10${moodFilter ? `&mood=${moodFilter}` : ""}`,
       );
 
       if (!res.ok || !res.data) {
-        showAlert(res.message || "다음 리스트를 불러오지 못했습니다.");
+        const message = res.message || "다음 리스트를 불러오지 못했습니다.";
+
+        setPublicError(message);
+        showAlert(message);
 
         return;
       }
@@ -421,9 +729,38 @@ function ListsPage() {
     } catch (error) {
       console.error("다른 사람 리스트 추가 조회 실패:", error);
 
-      showAlert("다음 리스트를 불러오는 중 오류가 발생했습니다.");
+      const message = "다음 리스트를 불러오는 중 오류가 발생했습니다.";
+
+      setPublicError(message);
+      showAlert(message);
     } finally {
       setLoadingMorePublicLists(false);
+    }
+  };
+
+  /* =========================================================
+   * 다른 사람 리스트 mood 필터
+   * ========================================================= */
+
+  const handleMoodFilterChange = async (mood: MoodTagValue | null) => {
+    setMoodFilter(mood);
+    setPublicError("");
+
+    try {
+      const res = await apiFetchJson<RestaurantListsResponse>(
+        `/api/v1/lists/others?page=0&size=10${mood ? `&mood=${mood}` : ""}`,
+      );
+
+      if (res.ok && res.data) {
+        setPublicLists(res.data.lists);
+        setPublicPage(0);
+        setPublicTotalPages(res.data.totalPages);
+      } else {
+        setPublicError(res.message || "다른 사람 리스트를 불러오지 못했습니다.");
+      }
+    } catch (error) {
+      console.error("다른 사람 리스트 mood 필터 조회 실패:", error);
+      setPublicError("다른 사람 리스트를 불러오는 중 오류가 발생했습니다.");
     }
   };
 
@@ -440,15 +777,13 @@ function ListsPage() {
 
     const load = async () => {
       const my = await loadLists();
+      const latestLocation = latestLocationRef.current;
 
-      const selectedListId = initialSelectedParam
-        ? Number(initialSelectedParam)
-        : null;
-
-      if (selectedListId !== null && Number.isFinite(selectedListId)) {
-        setActiveTab("my");
-        setSelectedId(selectedListId);
-      } else if (my.length > 0) {
+      if (
+        latestLocation.selectedId === null &&
+        latestLocation.tab === "my" &&
+        my.length > 0
+      ) {
         setSelectedId(my[0].id);
       }
 
@@ -456,7 +791,9 @@ function ListsPage() {
     };
 
     void load();
-  }, [initialSelectedParam]);
+    // 초기 마운트 시 1회만 로드하는 것이 의도 (loadLists는 매 렌더 새로 생성되므로 deps에 넣으면 반복 호출됨)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* =========================================================
    * 리스트 선택 + 상세 영역으로 자동 스크롤
@@ -465,6 +802,7 @@ function ListsPage() {
   const handleSelectList = (listId: number) => {
     setSelectedId(listId);
     setMapError("");
+    setDetailError("");
 
     window.setTimeout(() => {
       detailPanelRef.current?.scrollIntoView({
@@ -488,6 +826,7 @@ function ListsPage() {
     const loadDetail = async () => {
       setSelectedDetail(null);
       setMapError("");
+      setDetailError("");
 
       try {
         /* 저장한 리스트 */
@@ -495,11 +834,13 @@ function ListsPage() {
         if (activeTab === "saved") {
           const saved = savedLists.find((list) => list.listId === selectedId);
 
-          if (!cancelled) {
-            setSelectedDetail(saved ?? null);
-          }
+          if (saved) {
+            if (!cancelled) {
+              setSelectedDetail(saved);
+            }
 
-          return;
+            return;
+          }
         }
 
         /* 내 리스트 / 다른 사람 리스트 */
@@ -519,6 +860,7 @@ function ListsPage() {
           setSelectedDetail(res.data);
         } else {
           setSelectedDetail(null);
+          setDetailError(res.message || "리스트 상세를 불러오지 못했습니다.");
 
           console.error("리스트 상세 조회 실패:", res.message);
         }
@@ -530,6 +872,7 @@ function ListsPage() {
         console.error("리스트 상세 조회 오류:", error);
 
         setSelectedDetail(null);
+        setDetailError("리스트 상세를 불러오는 중 오류가 발생했습니다.");
       }
     };
 
@@ -595,25 +938,49 @@ function ListsPage() {
 
     let retryTimer: number | undefined;
 
-    let cancelled = false;
+    let stopped = false;
+
+    const deadlineTimer = window.setTimeout(() => {
+      stopped = true;
+
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
+
+      setMapError("지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }, KAKAO_MAP_DEADLINE_MS);
+
+    const clearWaitingTimers = () => {
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
+
+      window.clearTimeout(deadlineTimer);
+    };
 
     const initializeMap = () => {
-      if (cancelled) {
+      if (stopped) {
         return;
       }
 
       const maps = window.kakao?.maps;
 
       if (!maps) {
-        retryTimer = window.setTimeout(initializeMap, 100);
+        retryTimer = window.setTimeout(
+          initializeMap,
+          KAKAO_MAP_RETRY_INTERVAL_MS,
+        );
 
         return;
       }
 
       const renderMap = () => {
-        if (cancelled || !mapContainerRef.current) {
+        if (stopped || !mapContainerRef.current) {
           return;
         }
+
+        stopped = true;
+        clearWaitingTimers();
 
         const firstItem = itemsWithCoordinates[0];
 
@@ -706,11 +1073,8 @@ function ListsPage() {
     initializeMap();
 
     return () => {
-      cancelled = true;
-
-      if (retryTimer) {
-        window.clearTimeout(retryTimer);
-      }
+      stopped = true;
+      clearWaitingTimers();
     };
   }, [selectedDetail]);
 
@@ -773,6 +1137,8 @@ function ListsPage() {
     setSelectedDetail(null);
 
     setMapError("");
+
+    setDetailError("");
   };
 
   /* =========================================================
@@ -787,6 +1153,8 @@ function ListsPage() {
     setSelectedId(listId);
 
     setMapError("");
+
+    setDetailError("");
 
     window.setTimeout(() => {
       detailPanelRef.current?.scrollIntoView({
@@ -806,6 +1174,12 @@ function ListsPage() {
     }
 
     if (activeTab !== "my") {
+      return;
+    }
+
+    if (selectedDetail.items.length <= 1) {
+      showAlert("리스트에는 식당이 한 개 이상 필요합니다.");
+
       return;
     }
 
@@ -888,6 +1262,32 @@ function ListsPage() {
   };
 
   /* =========================================================
+   *  식당 리스트 삭제
+   * ========================================================= */
+
+  const executeDeleteList = async (listId: number) => {
+    const res = await apiFetchJson(`/api/v1/lists/${listId}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      showAlert(res.message || "리스트 삭제에 실패했습니다.");
+      return;
+    }
+
+    setMyLists((prev) => prev.filter((list) => list.id !== listId));
+
+    await loadLists();
+
+    setSelectedId(null);
+    setSelectedDetail(null);
+
+    router.replace("/lists");
+
+    showAlert("리스트가 삭제되었습니다.");
+  };
+
+  /* =========================================================
    * 다른 사람 리스트 저장
    *
    * 핵심:
@@ -947,6 +1347,8 @@ function ListsPage() {
         return [savedList, ...prev];
       });
 
+      await loadPopularLists();
+
       showAlert("리스트를 저장했습니다.");
     } catch (error) {
       console.error("리스트 저장 오류:", error);
@@ -1003,6 +1405,8 @@ function ListsPage() {
       setSavedLists((prev) =>
         prev.filter((savedList) => savedList.listId !== currentListId),
       );
+
+      await loadPopularLists();
 
       if (activeTab === "saved") {
         setSelectedId(null);
@@ -1133,6 +1537,11 @@ function ListsPage() {
       return;
     }
 
+    if (action.type === "deleteList") {
+      void executeDeleteList(action.listId);
+      return;
+    }
+
     if (action.type === "unsave") {
       void executeUnsave();
     }
@@ -1145,14 +1554,19 @@ function ListsPage() {
   const confirmMessage =
     confirmAction?.type === "deleteItem"
       ? `리스트에서 '${confirmAction.item.restaurantName}'을 삭제할까요?`
-      : confirmAction?.type === "unsave"
-        ? "리스트 저장을 취소할까요?"
-        : "";
+      : confirmAction?.type === "deleteList"
+        ? "리스트를 삭제할까요?"
+        : confirmAction?.type === "unsave"
+          ? "리스트 저장을 취소할까요?"
+          : "";
 
   const confirmButtonText =
-    confirmAction?.type === "deleteItem" ? "삭제" : "확인";
-
-  const confirmDestructive = confirmAction?.type === "deleteItem";
+    confirmAction?.type === "deleteItem" || confirmAction?.type === "deleteList"
+      ? "삭제"
+      : "확인";
+  const confirmDestructive =
+    confirmAction?.type === "deleteItem" ||
+    confirmAction?.type === "deleteList";
 
   /* =========================================================
    * 일반 리스트 카드
@@ -1185,7 +1599,7 @@ function ListsPage() {
             </p>
 
             <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-              {list.moodTag}
+              {moodLabel(list.moodTag)}
             </span>
           </div>
 
@@ -1239,7 +1653,7 @@ function ListsPage() {
             </p>
 
             <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-              {list.moodTag}
+              {moodLabel(list.moodTag)}
             </span>
           </div>
 
@@ -1263,10 +1677,11 @@ function ListsPage() {
 
   return (
     <>
-      <AppShell
-        fullWidth
-        leftSidebar={
-          <div className="sticky top-28 space-y-5">
+      <div ref={dialogBackgroundRef}>
+        <AppShell
+          fullWidth
+          leftSidebar={
+            <div className="sticky top-28 space-y-5">
             <SidebarProfile />
 
             {(popularLists.length > 0 || popularError) && (
@@ -1288,7 +1703,7 @@ function ListsPage() {
                           </p>
 
                           <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                            {list.moodTag}
+                            {moodLabel(list.moodTag)}
                           </span>
                         </div>
 
@@ -1326,7 +1741,7 @@ function ListsPage() {
                         </p>
 
                         <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                          {list.moodTag}
+                          {moodLabel(list.moodTag)}
                         </span>
                       </div>
 
@@ -1361,8 +1776,6 @@ function ListsPage() {
 
               <div className="h-24 animate-pulse rounded-2xl border border-hairline-soft bg-surface" />
             </div>
-          ) : error ? (
-            <p className="text-center text-sm text-red-500">{error}</p>
           ) : (
             <div className="grid w-full min-w-0 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
               {/* =================================================
@@ -1370,10 +1783,15 @@ function ListsPage() {
                * ================================================= */}
 
               <div className="min-w-0 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
+                <div
+                  className="flex flex-wrap items-center gap-2"
+                  role="group"
+                  aria-label="리스트 종류"
+                >
                   <button
                     type="button"
                     onClick={() => handleTabChange("my")}
+                    aria-pressed={activeTab === "my"}
                     className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
                       activeTab === "my"
                         ? "bg-primary text-white"
@@ -1386,6 +1804,7 @@ function ListsPage() {
                   <button
                     type="button"
                     onClick={() => handleTabChange("saved")}
+                    aria-pressed={activeTab === "saved"}
                     className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
                       activeTab === "saved"
                         ? "bg-primary text-white"
@@ -1398,6 +1817,7 @@ function ListsPage() {
                   <button
                     type="button"
                     onClick={() => handleTabChange("other")}
+                    aria-pressed={activeTab === "other"}
                     className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
                       activeTab === "other"
                         ? "bg-primary text-white"
@@ -1412,7 +1832,11 @@ function ListsPage() {
 
                 {activeTab === "my" && (
                   <>
-                    {myLists.length === 0 ? (
+                    {error ? (
+                      <p className="py-10 text-center text-sm text-red-500">
+                        {error}
+                      </p>
+                    ) : myLists.length === 0 ? (
                       <p className="py-10 text-center text-sm text-muted">
                         등록된 리스트가 없습니다.
                       </p>
@@ -1435,23 +1859,74 @@ function ListsPage() {
 
                 {/* 저장한 리스트 */}
 
-                {activeTab === "saved" &&
-                  (savedLists.length === 0 ? (
-                    <p className="py-10 text-center text-sm text-muted">
-                      저장한 리스트가 없습니다.
-                    </p>
-                  ) : (
-                    savedLists.map(renderSavedCard)
-                  ))}
+                {activeTab === "saved" && (
+                  <>
+                    {savedError && (
+                      <p className="py-4 text-center text-sm text-red-500">
+                        {savedError}
+                      </p>
+                    )}
+
+                    {savedLists.length === 0 ? (
+                      !savedError && (
+                        <p className="py-10 text-center text-sm text-muted">
+                          저장한 리스트가 없습니다.
+                        </p>
+                      )
+                    ) : (
+                      savedLists.map(renderSavedCard)
+                    )}
+
+                    {savedPage + 1 < savedTotalPages && (
+                      <button
+                        type="button"
+                        onClick={() => void loadMoreSavedLists()}
+                        disabled={loadingMoreSavedLists}
+                        className="w-full rounded-xl border border-hairline-soft bg-surface px-4 py-3 text-sm font-bold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {loadingMoreSavedLists ? "불러오는 중..." : "더보기"}
+                      </button>
+                    )}
+                  </>
+                )}
 
                 {/* 다른 사람 리스트 */}
 
                 {activeTab === "other" && (
                   <>
-                    {otherLists.length === 0 ? (
-                      <p className="py-10 text-center text-sm text-muted">
-                        다른 사람의 리스트가 없습니다.
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      {MOOD_TAGS.map((tag) => (
+                        <button
+                          key={tag.value}
+                          type="button"
+                          onClick={() =>
+                            void handleMoodFilterChange(
+                              moodFilter === tag.value ? null : tag.value,
+                            )
+                          }
+                          className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+                            moodFilter === tag.value
+                              ? "bg-primary text-white"
+                              : "bg-surface-soft text-muted hover:bg-hairline-soft"
+                          }`}
+                        >
+                          {tag.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {publicError && (
+                      <p className="py-4 text-center text-sm text-red-500">
+                        {publicError}
                       </p>
+                    )}
+
+                    {otherLists.length === 0 ? (
+                      !publicError && (
+                        <p className="py-10 text-center text-sm text-muted">
+                          다른 사람의 리스트가 없습니다.
+                        </p>
+                      )
                     ) : (
                       otherLists.map(renderSummaryCard)
                     )}
@@ -1488,7 +1963,7 @@ function ListsPage() {
                           </h3>
 
                           <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                            {selectedDetail.moodTag}
+                            {moodLabel(selectedDetail.moodTag)}
                           </span>
                         </div>
 
@@ -1522,6 +1997,24 @@ function ListsPage() {
                           >
                             <Pencil className="h-4 w-4" />
                             수정
+                          </button>
+                        )}
+
+                        {/* 내 리스트 삭제 */}
+
+                        {activeTab === "my" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setConfirmAction({
+                                type: "deleteList",
+                                listId: selectedDetail.listId,
+                              })
+                            }
+                            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            삭제
                           </button>
                         )}
 
@@ -1685,7 +2178,9 @@ function ListsPage() {
                                         <span
                                           className="min-w-0 truncate"
                                           title={
-                                            item.roadAddress || item.address || ""
+                                            item.roadAddress ||
+                                            item.address ||
+                                            ""
                                           }
                                         >
                                           {item.roadAddress || item.address}
@@ -1748,6 +2243,10 @@ function ListsPage() {
                       </div>
                     )}
                   </>
+                ) : detailError ? (
+                  <p className="py-24 text-center text-base text-red-500">
+                    {detailError}
+                  </p>
                 ) : (
                   <p className="py-24 text-center text-base text-muted">
                     리스트를 선택해주세요
@@ -1757,7 +2256,8 @@ function ListsPage() {
             </div>
           )}
         </div>
-      </AppShell>
+        </AppShell>
+      </div>
 
       {/* =====================================================
        * 알림창
@@ -1765,13 +2265,25 @@ function ListsPage() {
 
       {alertOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/35 px-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="알림"
+            aria-describedby="list-alert-description"
+            className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
+          >
             <div className="px-8 py-8">
-              <p className="text-lg leading-7 text-ink">{alertMessage}</p>
+              <p
+                id="list-alert-description"
+                className="text-lg leading-7 text-ink"
+              >
+                {alertMessage}
+              </p>
             </div>
 
             <div className="flex justify-end border-t border-hairline px-6 py-4">
               <button
+                ref={alertCloseButtonRef}
                 type="button"
                 onClick={() => setAlertOpen(false)}
                 className="rounded-lg px-4 py-2 text-base font-bold text-primary transition-colors hover:bg-primary/5"
@@ -1789,13 +2301,25 @@ function ListsPage() {
 
       {confirmAction !== null && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/35 px-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="확인"
+            aria-describedby="list-confirm-description"
+            className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
+          >
             <div className="px-8 py-8">
-              <p className="text-lg leading-7 text-ink">{confirmMessage}</p>
+              <p
+                id="list-confirm-description"
+                className="text-lg leading-7 text-ink"
+              >
+                {confirmMessage}
+              </p>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-hairline px-6 py-4">
               <button
+                ref={confirmCancelButtonRef}
                 type="button"
                 onClick={() => setConfirmAction(null)}
                 disabled={deletingItemId !== null || saving}
@@ -1805,6 +2329,7 @@ function ListsPage() {
               </button>
 
               <button
+                ref={confirmButtonRef}
                 type="button"
                 onClick={handleConfirm}
                 disabled={deletingItemId !== null || saving}

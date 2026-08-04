@@ -33,7 +33,7 @@ class RestaurantList protected constructor() : BaseEntity() {
         protected set
 
     // 분위기 태그
-    @Enumerated(EnumType.STRING)
+    @Enumerated(EnumType.ORDINAL)
     @Column(name = "mood_tag", length = 50)
     var moodTag: MoodTag? = null
         protected set

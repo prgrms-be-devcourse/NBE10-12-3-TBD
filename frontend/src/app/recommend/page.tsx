@@ -20,9 +20,10 @@ import {
 } from "lucide-react";
 import AppShell, { SidebarProfile, SidebarCard } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
+import { MOOD_TAGS } from "@/lib/mood";
 import regionsData from "@/data/regions.json";
 
-const categories = ["한식", "일식", "양식", "중식", "분식", "카페", "아시안", "기타"];
+const categories = ["한식", "일식", "양식", "중식", "분식", "카페", "치킨", "패스트푸드", "술집", "뷔페", "샤브샤브", "퓨전요리", "아시안", "기타"];
 
 interface HotPlace {
   id: number;
@@ -39,8 +40,12 @@ const categoryEmoji: Record<string, string> = {
   "분식": "🍢",
   "카페": "☕\uFE0F",
   "아시안": "🍛",
-  "피자": "🍕",
   "치킨": "🍗",
+  "패스트푸드": "🍔",
+  "술집": "🍺",
+  "뷔페": "🍽️",
+  "샤브샤브": "🍲",
+  "퓨전요리": "🥘",
 };
 const categoryToEnum: Record<string, string> = {
   "한식": "KOREAN",
@@ -50,8 +55,12 @@ const categoryToEnum: Record<string, string> = {
   "분식": "SNACK",
   "카페": "CAFE",
   "아시안": "ASIAN",
-  "피자": "ETC",
-  "치킨": "ETC",
+  "치킨": "CHICKEN",
+  "패스트푸드": "FASTFOOD",
+  "술집": "BAR",
+  "뷔페": "BUFFET",
+  "샤브샤브": "SHABU",
+  "퓨전요리": "FUSION",
 };
 
 const moods = ["데이트", "혼밥", "회식", "야식", "가족", "친구"];
@@ -97,6 +106,13 @@ interface KakaoRestaurant {
   lng: number;
 }
 
+interface RecommendItem {
+  kakaoPlaceId: string;
+  category: string;
+  categoryLabel: string;
+  distanceMeter: number | null;
+}
+
 function categoryLabel(enumValue: string): string {
   const found = Object.entries(categoryToEnum).find(([, v]) => v === enumValue);
   return found ? found[0] : enumValue;
@@ -118,6 +134,7 @@ export default function RecommendPage() {
   const [resultModalOpen, setResultModalOpen] = useState(false);
   const [recommendLoading, setRecommendLoading] = useState(false);
   const [recommendError, setRecommendError] = useState("");
+  const [distanceFallback, setDistanceFallback] = useState(false);
   const [current, setCurrent] = useState<RecommendRestaurant | null>(null);
   const [hotPlaces, setHotPlaces] = useState<HotPlace[]>([]);
 
@@ -125,6 +142,12 @@ export default function RecommendPage() {
   const [map, setMap] = useState<KakaoMap | null>(null);
   const markerRef = useRef<KakaoMarker | null>(null);
   const placesRef = useRef<KakaoPlaces | null>(null);
+
+  // 추천 후보 풀/소비 큐/이미 본 식당 관리
+  const poolRef = useRef<KakaoRestaurant[]>([]);
+  const queueRef = useRef<RecommendItem[]>([]);
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  const [currentLabel, setCurrentLabel] = useState("기타");
 
   const locationLabel =
     selectedRegion1 +
@@ -279,13 +302,16 @@ export default function RecommendPage() {
     if (selectedRegion2 && selectedRegion2 !== "전체") parts.push(selectedRegion2);
     if (selectedRegion3 && selectedRegion3 !== "전체") parts.push(selectedRegion3);
     if (selectedRegion4 && selectedRegion4 !== "전체") parts.push(selectedRegion4);
-    if (selectedCategory && selectedCategory !== "기타") parts.push(selectedCategory);
+    if (selectedCategory && selectedCategory !== "기타") {
+      parts.push(selectedCategory === "아시안" ? "아시아음식" : selectedCategory);
+    }
     return parts.join(" ");
   };
 
-  const searchKakaoRestaurants = (
+  // 카카오 키워드 검색을 최대 3페이지(45건)까지 수집
+  const searchKakaoPool = (
     keyword: string,
-    options?: { location?: { lat: number; lng: number } },
+    groupCode: string,
   ): Promise<KakaoRestaurant[]> => {
     return new Promise((resolve, reject) => {
       const maps = window.kakao?.maps;
@@ -295,45 +321,43 @@ export default function RecommendPage() {
       }
 
       const services = maps.services;
-      const searchOptions: Record<string, unknown> = {
-        category_group_code: "FD6",
-        size: 15,
-      };
-
-      if (options?.location) {
-        searchOptions.location = new maps.LatLng(options.location.lat, options.location.lng);
-        searchOptions.sort = "DISTANCE";
-      }
+      const all: KakaoRestaurant[] = [];
 
       placesRef.current.keywordSearch(
         keyword,
-        (data: KakaoPlaceItem[], status: string) => {
+        (data: KakaoPlaceItem[], status: string, pagination: KakaoPagination) => {
           if (status === services.Status.OK) {
-            const mapped: KakaoRestaurant[] = data.map((item: KakaoPlaceItem) => {
-              const addressParts = item.address_name ? item.address_name.split(" ") : [];
-              return {
-                kakaoPlaceId: item.id,
-                name: item.place_name,
-                category: item.category_name,
-                address: item.address_name,
-                roadAddress: item.road_address_name,
-                region1: addressParts[0] || "",
-                region2: addressParts[1] || "",
-                region3: addressParts[2] || "",
-                region4: addressParts[3] || "",
-                phone: item.phone || "",
-                lat: Number(item.y),
-                lng: Number(item.x),
-              };
-            });
-            resolve(mapped);
+            all.push(
+              ...data.map((item: KakaoPlaceItem) => {
+                const addressParts = item.address_name ? item.address_name.split(" ") : [];
+                return {
+                  kakaoPlaceId: item.id,
+                  name: item.place_name,
+                  category: item.category_name,
+                  address: item.address_name,
+                  roadAddress: item.road_address_name,
+                  region1: addressParts[0] || "",
+                  region2: addressParts[1] || "",
+                  region3: addressParts[2] || "",
+                  region4: addressParts[3] || "",
+                  phone: item.phone || "",
+                  lat: Number(item.y),
+                  lng: Number(item.x),
+                };
+              }),
+            );
+            if (pagination.hasNextPage && pagination.current < 3) {
+              pagination.nextPage();
+            } else {
+              resolve(all);
+            }
           } else if (status === services.Status.ZERO_RESULT) {
-            resolve([]);
+            resolve(all);
           } else {
             reject(new Error("검색 결과를 불러오지 못했습니다."));
           }
         },
-        searchOptions,
+        { category_group_code: groupCode, size: 15 },
       );
     });
   };
@@ -341,14 +365,7 @@ export default function RecommendPage() {
   const ensureRestaurant = async (
     restaurant: KakaoRestaurant,
   ): Promise<RecommendRestaurant | null> => {
-    const findRes = await apiFetchJson<RecommendRestaurant>(
-      `/api/v1/restaurants?kakaoPlaceId=${restaurant.kakaoPlaceId}`,
-    );
-
-    if (findRes.ok && findRes.data) {
-      return findRes.data;
-    }
-
+    // 백엔드가 find-or-create를 처리하므로 바로 저장 요청
     const saveRes = await apiFetchJson<RecommendRestaurant>("/api/v1/restaurants", {
       method: "POST",
       body: JSON.stringify({
@@ -375,42 +392,120 @@ export default function RecommendPage() {
     return saveRes.data;
   };
 
+  const getCurrentPosition = (): Promise<{ lat: number; lng: number } | null> =>
+    new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        // CoreLocation이 실패 콜백을 늦게 주는 환경에서 무한 대기하지 않도록
+        { timeout: 5000, maximumAge: 60000 },
+      );
+    });
+
   const fetchRecommend = async () => {
     setRecommendLoading(true);
     setRecommendError("");
+    setDistanceFallback(false);
 
     try {
-      const keyword = buildSearchKeyword();
-      const options: { location?: { lat: number; lng: number } } = {};
+      // 위치는 한 번만 요청 (거리순 폴 back 판단 + distanceMeter 계산에 공용)
+      const position = await getCurrentPosition();
 
-      if (sortBy === "distance") {
-        const position = await new Promise<{ lat: number; lng: number } | null>((resolve) => {
-          if (!navigator.geolocation) {
-            resolve(null);
-            return;
-          }
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            () => resolve(null),
-          );
-        });
-        if (position) options.location = position;
+      let effectiveSort = sortBy;
+
+      if (sortBy === "distance" && !position) {
+        // 위치를 못 얻으면 에러 대신 랜덤으로 폴 back하고 안내 표시
+        effectiveSort = "random";
+        setDistanceFallback(true);
       }
 
-      const results = await searchKakaoRestaurants(keyword, options);
+      // 큐에 아직 안 본 후보가 남아있으면 재요청 없이 소비
+      let queue = queueRef.current.filter((r) => !seenIdsRef.current.has(r.kakaoPlaceId));
 
-      if (results.length === 0) {
-        setRecommendError("조건에 맞는 식당이 없습니다.");
+      if (queue.length === 0) {
+        const keyword = buildSearchKeyword();
+        const groupCode = selectedCategory === "카페" ? "CE7" : "FD6";
+
+        // mood 키워드를 포함해 검색하고, 결과가 없으면 mood 없이 재검색
+        let pool = await searchKakaoPool(`${keyword} ${selectedMood}`.trim(), groupCode);
+        if (pool.length === 0 && selectedMood) {
+          pool = await searchKakaoPool(keyword, groupCode);
+        }
+
+        if (pool.length === 0) {
+          setRecommendError("조건에 맞는 식당이 없습니다.");
+          setCurrent(null);
+          setRecommendLoading(false);
+          return;
+        }
+
+        poolRef.current = pool;
+
+        const res = await apiFetchJson<{ recommendations: RecommendItem[] }>(
+          "/api/v1/restaurants/recommend",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              candidates: pool.map((r) => ({
+                kakaoPlaceId: r.kakaoPlaceId,
+                name: r.name,
+                categoryName: r.category,
+                address: r.address,
+                roadAddress: r.roadAddress,
+                region1: r.region1,
+                region2: r.region2,
+                region3: r.region3,
+                region4: r.region4,
+                phone: r.phone,
+                lat: r.lat,
+                lng: r.lng,
+              })),
+              category: selectedCategory !== "기타" ? categoryToEnum[selectedCategory] : null,
+              mood: MOOD_TAGS.find((t) => t.label === selectedMood)?.value ?? null,
+              sort: effectiveSort === "distance" ? "DISTANCE" : "RANDOM",
+              lat: position?.lat ?? null,
+              lng: position?.lng ?? null,
+              exclude: [...seenIdsRef.current],
+            }),
+          },
+        );
+
+        if (!res.ok || !res.data) {
+          setRecommendError(res.message || "조건에 맞는 식당이 없습니다.");
+          setCurrent(null);
+          setRecommendLoading(false);
+          return;
+        }
+
+        queueRef.current = res.data.recommendations;
+        queue = queueRef.current.filter((r) => !seenIdsRef.current.has(r.kakaoPlaceId));
+
+        if (queue.length === 0) {
+          setRecommendError("조건에 맞는 식당이 없습니다.");
+          setCurrent(null);
+          setRecommendLoading(false);
+          return;
+        }
+      }
+
+      const next = queue[0];
+      seenIdsRef.current.add(next.kakaoPlaceId);
+
+      const full = poolRef.current.find((r) => r.kakaoPlaceId === next.kakaoPlaceId);
+      if (!full) {
+        setRecommendError("추천 정보를 찾지 못했습니다.");
         setCurrent(null);
         setRecommendLoading(false);
         return;
       }
 
-      const randomIndex = Math.floor(Math.random() * results.length);
-      const selected = results[randomIndex];
-      const saved = await ensureRestaurant(selected);
-
+      const saved = await ensureRestaurant(full);
       if (saved) {
+        setCurrentLabel(next.categoryLabel);
         setCurrent(saved);
       } else {
         setCurrent(null);
@@ -424,6 +519,9 @@ export default function RecommendPage() {
   };
 
   const handleRecommend = async () => {
+    poolRef.current = [];
+    queueRef.current = [];
+    seenIdsRef.current = new Set();
     await fetchRecommend();
     setResultModalOpen(true);
   };
@@ -698,6 +796,12 @@ export default function RecommendPage() {
               </div>
             ) : (
               <>
+                {distanceFallback && (
+                  <p className="mb-3 rounded-xl bg-surface-soft px-4 py-2.5 text-center text-xs font-bold text-muted">
+                    현재 위치를 가져올 수 없어 랜덤으로 추천했어요
+                  </p>
+                )}
+
                 {/* Map */}
                 <div className="relative mb-5 h-48 w-full overflow-hidden rounded-2xl border border-hairline-soft">
                   <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
@@ -726,12 +830,12 @@ export default function RecommendPage() {
                 {/* Draft card */}
                 <div className="rounded-2xl bg-surface border border-hairline-soft overflow-hidden shadow-sm">
                   <div className="aspect-[16/10] w-full bg-primary-soft flex items-center justify-center text-7xl">
-                    {categoryEmoji[categoryLabel(current.category)] || "🍽\uFE0F"}
+                    {categoryEmoji[currentLabel] || "🍽\uFE0F"}
                   </div>
                   <div className="p-6">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary-active">
-                        {categoryLabel(current.category)}
+                        {currentLabel}
                       </span>
                       <span className="rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
                         {selectedMood}

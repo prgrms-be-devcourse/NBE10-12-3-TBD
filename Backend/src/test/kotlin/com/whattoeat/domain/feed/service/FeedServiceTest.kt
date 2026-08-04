@@ -11,6 +11,7 @@ import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.feedlike.repository.FeedLikeRepository
 import com.whattoeat.domain.follow.repository.FollowRepository
 import com.whattoeat.domain.notification.repository.NotificationRepository
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
 import com.whattoeat.domain.user.entity.Provider
 import com.whattoeat.domain.user.entity.User
@@ -122,7 +123,7 @@ class FeedServiceTest {
             .email("user1@test.com")
             .provider(Provider.LOCAL)
             .build()
-        val feedCreateRequest = FeedCreateRequest("맛집이네요", null)
+        val feedCreateRequest = FeedCreateRequest("맛집이네요", null, MoodTag.SOLO)
         val image: MultipartFile? = null
 
         val savedFeed =
@@ -146,7 +147,7 @@ class FeedServiceTest {
             .provider(Provider.LOCAL)
             .build()
         ReflectionTestUtils.setField(user, "id", 1L)
-        val feedCreateRequest = FeedCreateRequest("맛집이네요", null)
+        val feedCreateRequest = FeedCreateRequest("맛집이네요", null, MoodTag.SOLO)
         val image: MultipartFile? = null
 
         val savedFeed =
@@ -204,7 +205,7 @@ class FeedServiceTest {
         val owner = createTestUser(1L, "owner")
         val other = createTestUser(2L, "other")
         val feed = Feed.builder().user(owner).content("원본 내용").build()
-        val request = FeedUpdateRequest("수정된 내용", null, false)
+        val request = FeedUpdateRequest("수정된 내용", null, false, null)
         given(feedRepository.findById(1L)).willReturn(Optional.of(feed))
         val image: MultipartFile? = null
 
@@ -220,7 +221,7 @@ class FeedServiceTest {
     @Test
     @DisplayName("피드 수정 실패 - 존재하지 않는 필드")
     fun updateFeed_notFound() {
-        val req = FeedUpdateRequest("수정된 내용", null, false)
+        val req = FeedUpdateRequest("수정된 내용", null, false, null)
         val image: MultipartFile? = null
 
         given(feedRepository.findById(999L)).willReturn(Optional.empty())
@@ -236,12 +237,31 @@ class FeedServiceTest {
         val feed = Feed.builder().user(user).content("원본 내용").build()
         val image: MultipartFile? = null
 
-        val request = FeedUpdateRequest("수정된 내용", null, false)
+        val request = FeedUpdateRequest("수정된 내용", null, false, null)
         given(feedRepository.findById(1L)).willReturn(Optional.of(feed))
         given(feedRepository.save(any())).willReturn(feed)
 
         val result: FeedDetailResponse = feedService.updateFeed(1L, 1L, request, image)
         assertThat(result.content).isEqualTo("수정된 내용")
+    }
+
+    @Test
+    @DisplayName("피드 수정 성공 - moodTag가 있으면 변경, 없으면 기존 유지")
+    fun updateFeed_moodTag() {
+        val user = createTestUser(1L, "testUser")
+        val image: MultipartFile? = null
+
+        // moodTag 전송 시 변경됨
+        val feedWithMood = Feed.builder().user(user).content("원본").moodTag(MoodTag.SOLO).build()
+        given(feedRepository.findById(1L)).willReturn(Optional.of(feedWithMood))
+        given(feedRepository.save(any())).willReturn(feedWithMood)
+
+        val changed = feedService.updateFeed(1L, 1L, FeedUpdateRequest("수정", null, false, MoodTag.DATE), image)
+        assertThat(changed.moodTag).isEqualTo(MoodTag.DATE)
+
+        // moodTag 미전송 시 기존 값 유지
+        val kept = feedService.updateFeed(1L, 1L, FeedUpdateRequest("수정2", null, false, null), image)
+        assertThat(kept.moodTag).isEqualTo(MoodTag.DATE)
     }
 
     @Test
@@ -254,7 +274,7 @@ class FeedServiceTest {
         given(feedRepository.findById(1L)).willReturn(Optional.of(feed))
         given(feedRepository.save(any(Feed::class.java))).willReturn(feed)
 
-        val request = FeedUpdateRequest("수정할 내용", null, true)
+        val request = FeedUpdateRequest("수정할 내용", null, true, null)
         val result: FeedDetailResponse = feedService.updateFeed(1L, 1L, request, null)
 
         assertThat(result.imageUrl).isNull()

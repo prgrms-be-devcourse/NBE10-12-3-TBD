@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { apiFetchJson } from "@/lib/api";
+import { buildListHref } from "@/lib/listNavigation";
 
 type NotificationType = "NEW_FEED" | "FEED_LIKE" | "FEED_COMMENT" | "FOLLOW" | "LIST_SHARE";
 
@@ -141,7 +142,9 @@ export function NotificationBell() {
         if (notification.actorId) router.push(`/profile/${notification.actorId}`);
         break;
       case "LIST_SHARE":
-        if (notification.restaurantListId) router.push(`/lists/${notification.restaurantListId}`);
+        if (notification.restaurantListId) {
+          router.push(buildListHref(notification.restaurantListId, "other"));
+        }
         break;
     }
   };

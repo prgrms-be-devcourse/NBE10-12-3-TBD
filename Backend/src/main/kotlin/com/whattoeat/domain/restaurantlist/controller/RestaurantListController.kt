@@ -1,5 +1,6 @@
 package com.whattoeat.domain.restaurantlist.controller
 
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurantlist.dto.RestaurantListRequest
 import com.whattoeat.domain.restaurantlist.dto.RestaurantListResponse
 import com.whattoeat.domain.restaurantlist.service.RestaurantListService
@@ -213,11 +214,12 @@ class RestaurantListController (
     @Operation(summary = "전체 맛집 리스트 다건 조회")
     fun getAllRestaurantLists(
             @RequestParam(defaultValue = "0") page: Int,
-            @RequestParam(defaultValue = "10") size: Int
+            @RequestParam(defaultValue = "10") size: Int,
+            @RequestParam(required = false) mood: MoodTag?
     ) : RsData<RestaurantListResponse.RestaurantListsResponse> {
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
 
-        val result = restaurantListService.findAll(pageable)
+        val result = restaurantListService.findAll(mood, pageable)
 
         val lists = result.content.map { RestaurantListResponse.RestaurantLists(it) }
 
@@ -231,12 +233,41 @@ class RestaurantListController (
         )
     }
 
+    @GetMapping("/users/{userId}")
+    @Operation(summary = "특정 사용자의 맛집 리스트 다건 조회")
+    fun getRestaurantListsByUserId(
+        @PathVariable userId: Long,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "10") size: Int
+    ): RsData<RestaurantListResponse.RestaurantListsResponse> {
+        val pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
+        val result = restaurantListService.findPublicByUserId(userId, pageable)
+        val lists = result.content.map { RestaurantListResponse.RestaurantLists(it) }
+
+        return RsData.success(
+            RestaurantListResponse.RestaurantListsResponse(
+                lists,
+                result.totalPages,
+                result.totalElements
+            ),
+            "사용자의 맛집 리스트 목록 조회가 완료되었습니다."
+        )
+    }
+
     @GetMapping("/others")
     @Operation(summary = "다른 사용자의 맛집 리스트 다건 조회")
     fun getOtherRestaurantLists(
             @AuthenticationPrincipal userDetails: CustomUserDetails,
             @RequestParam(defaultValue = "0") page: Int,
-            @RequestParam(defaultValue = "10") size: Int
+            @RequestParam(defaultValue = "10") size: Int,
+            @RequestParam(required = false) mood: MoodTag?
     ) : RsData<RestaurantListResponse.RestaurantListsResponse> {
         val userId = userDetails.userId;
 
@@ -246,7 +277,7 @@ class RestaurantListController (
                 Sort.by(Sort.Direction.DESC, "createdAt")
         )
 
-        val result = restaurantListService.findAllExceptUser(userId, pageable)
+        val result = restaurantListService.findAllExceptUser(userId, mood, pageable)
 
         val lists =
                 result.content.map { RestaurantListResponse.RestaurantLists(it) }

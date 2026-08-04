@@ -6,6 +6,8 @@ import { Check, ChevronLeft, Search, X } from "lucide-react";
 
 import AppShell from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
+import { MOOD_TAGS, moodLabel } from "@/lib/mood";
+import { buildListHref } from "@/lib/listNavigation";
 
 /* =========================================================
  * 카카오 검색 결과
@@ -75,24 +77,7 @@ interface CreateListResponse {
  * 무드태그
  * ========================================================= */
 
-const moodTags = [
-  {
-    label: "데이트",
-    value: "DATE",
-  },
-  {
-    label: "친구와",
-    value: "FRIENDS",
-  },
-  {
-    label: "가족과",
-    value: "FAMILY",
-  },
-  {
-    label: "혼밥",
-    value: "SOLO",
-  },
-];
+const moodTags = MOOD_TAGS;
 
 /* =========================================================
  * 페이지
@@ -514,6 +499,12 @@ export default function CreateListPage() {
       return;
     }
 
+    if (selectedRestaurants.length === 0) {
+      alert("식당을 한 개 이상 선택해주세요.");
+
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -585,7 +576,7 @@ export default function CreateListPage() {
        * 4. 최종 완료
        * ----------------------------------------------------- */
 
-      router.push(`/lists?selected=${listId}`);
+      router.push(buildListHref(listId, "my"));
     } catch (error) {
       console.error("리스트 저장 중 오류:", error);
 
@@ -933,7 +924,7 @@ export default function CreateListPage() {
               {/* 리스트 정보 */}
 
               <div className="rounded-xl bg-surface-soft p-5">
-                <p className="text-sm font-medium text-primary">{moodTag}</p>
+                <p className="text-sm font-medium text-primary">{moodLabel(moodTag)}</p>
 
                 <h2 className="mt-1 text-xl font-bold text-ink">{title}</h2>
 
