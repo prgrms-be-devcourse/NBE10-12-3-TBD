@@ -78,3 +78,13 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-soft);
 }
+
+/* 탐색 페이지 모바일 지도 높이 — dvh 지원 브라우저는 주소창 변화 반영 */
+.search-map-viewport {
+  height: calc(100vh - 10.5rem);
+}
+@supports (height: 100dvh) {
+  .search-map-viewport {
+    height: calc(100dvh - 10.5rem);
+  }
+}
