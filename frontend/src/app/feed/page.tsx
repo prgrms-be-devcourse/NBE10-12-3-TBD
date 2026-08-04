@@ -263,6 +263,10 @@ function FeedContent() {
   };
 
   const handleTabChange = (tab: "following" | "recommended") => {
+    if (activeTab === tab) {
+      return;
+    }
+
     setPage(0);
     setPosts([]);
     router.replace(`/feed?tab=${tab}`, { scroll: false });
@@ -305,7 +309,9 @@ function FeedContent() {
                       className="flex items-center gap-3"
                     >
                       <img
-                        src={getImageUrl(f.profileImage) ?? "/default-profile.png"}
+                        src={
+                          getImageUrl(f.profileImage) ?? "/default-profile.png"
+                        }
                         alt=""
                         className="h-10 w-10 rounded-full object-cover"
                       />
@@ -389,7 +395,9 @@ function FeedContent() {
                     className="flex items-center gap-3 group"
                   >
                     <img
-                      src={getImageUrl(post.profileImage) ?? "/default-profile.png"}
+                      src={
+                        getImageUrl(post.profileImage) ?? "/default-profile.png"
+                      }
                       alt=""
                       className="h-10 w-10 rounded-full object-cover ring-1 ring-hairline-soft"
                     />

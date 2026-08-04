@@ -3,7 +3,15 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Bookmark, MapPin, Pencil, Plus, Trash2, UserPlus, UserCheck } from "lucide-react";
+import {
+  Bookmark,
+  MapPin,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+  UserCheck,
+} from "lucide-react";
 
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
@@ -125,6 +133,10 @@ type ConfirmAction =
   | {
       type: "deleteItem";
       item: ListItem;
+    }
+  | {
+      type: "deleteList";
+      listId: number;
     }
   | {
       type: "unsave";
@@ -415,6 +427,31 @@ function ListsPage() {
       confirmPreviousFocusRef.current = null;
     };
   }, [confirmAction]);
+
+  /* =========================================================
+   * 인기 리스트만 불러오기
+   * ========================================================= */
+
+  const loadPopularLists = async () => {
+    try {
+      const res = await apiFetchJson<PopularRestaurantListsResponse>(
+        "/api/v1/lists/popular?size=5",
+      );
+
+      if (res.ok && res.data) {
+        setPopularLists(res.data.lists);
+        setPopularError("");
+      } else {
+        setPopularLists([]);
+        setPopularError(res.message || "인기 리스트를 불러오지 못했습니다.");
+      }
+    } catch (error) {
+      console.error("인기 리스트 조회 실패:", error);
+
+      setPopularLists([]);
+      setPopularError("인기 리스트를 불러오는 중 오류가 발생했습니다.");
+    }
+  };
 
   /* =========================================================
    * 리스트 목록 불러오기
@@ -1219,6 +1256,32 @@ function ListsPage() {
   };
 
   /* =========================================================
+   *  식당 리스트 삭제
+   * ========================================================= */
+
+  const executeDeleteList = async (listId: number) => {
+    const res = await apiFetchJson(`/api/v1/lists/${listId}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      showAlert(res.message || "리스트 삭제에 실패했습니다.");
+      return;
+    }
+
+    setMyLists((prev) => prev.filter((list) => list.id !== listId));
+
+    await loadLists();
+
+    setSelectedId(null);
+    setSelectedDetail(null);
+
+    router.replace("/lists");
+
+    showAlert("리스트가 삭제되었습니다.");
+  };
+
+  /* =========================================================
    * 다른 사람 리스트 저장
    *
    * 핵심:
@@ -1278,6 +1341,8 @@ function ListsPage() {
         return [savedList, ...prev];
       });
 
+      await loadPopularLists();
+
       showAlert("리스트를 저장했습니다.");
     } catch (error) {
       console.error("리스트 저장 오류:", error);
@@ -1334,6 +1399,8 @@ function ListsPage() {
       setSavedLists((prev) =>
         prev.filter((savedList) => savedList.listId !== currentListId),
       );
+
+      await loadPopularLists();
 
       if (activeTab === "saved") {
         setSelectedId(null);
@@ -1464,6 +1531,11 @@ function ListsPage() {
       return;
     }
 
+    if (action.type === "deleteList") {
+      void executeDeleteList(action.listId);
+      return;
+    }
+
     if (action.type === "unsave") {
       void executeUnsave();
     }
@@ -1476,14 +1548,19 @@ function ListsPage() {
   const confirmMessage =
     confirmAction?.type === "deleteItem"
       ? `리스트에서 '${confirmAction.item.restaurantName}'을 삭제할까요?`
-      : confirmAction?.type === "unsave"
-        ? "리스트 저장을 취소할까요?"
-        : "";
+      : confirmAction?.type === "deleteList"
+        ? "리스트를 삭제할까요?"
+        : confirmAction?.type === "unsave"
+          ? "리스트 저장을 취소할까요?"
+          : "";
 
   const confirmButtonText =
-    confirmAction?.type === "deleteItem" ? "삭제" : "확인";
-
-  const confirmDestructive = confirmAction?.type === "deleteItem";
+    confirmAction?.type === "deleteItem" || confirmAction?.type === "deleteList"
+      ? "삭제"
+      : "확인";
+  const confirmDestructive =
+    confirmAction?.type === "deleteItem" ||
+    confirmAction?.type === "deleteList";
 
   /* =========================================================
    * 일반 리스트 카드
@@ -1917,6 +1994,24 @@ function ListsPage() {
                           </button>
                         )}
 
+                        {/* 내 리스트 삭제 */}
+
+                        {activeTab === "my" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setConfirmAction({
+                                type: "deleteList",
+                                listId: selectedDetail.listId,
+                              })
+                            }
+                            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            삭제
+                          </button>
+                        )}
+
                         {/* 저장한 리스트 */}
 
                         {activeTab === "saved" && (
@@ -2077,7 +2172,9 @@ function ListsPage() {
                                         <span
                                           className="min-w-0 truncate"
                                           title={
-                                            item.roadAddress || item.address || ""
+                                            item.roadAddress ||
+                                            item.address ||
+                                            ""
                                           }
                                         >
                                           {item.roadAddress || item.address}
