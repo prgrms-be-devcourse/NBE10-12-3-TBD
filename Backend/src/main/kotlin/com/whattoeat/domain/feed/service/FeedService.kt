@@ -193,6 +193,8 @@ import org.springframework.web.multipart.MultipartFile
         }
 
         feed.update(request.content, restaurant, imageUrl)
+        // moodTag는 값이 있을 때만 변경 (미전송 시 기존 값 유지)
+        request.moodTag?.let { feed.moodTag = it }
         return FeedDetailResponse.from(feedRepository.save(feed))
     }
 

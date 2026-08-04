@@ -28,6 +28,7 @@ interface Feed {
   commentCount: number;
   restaurantId: number | null;
   restaurantName: string | null;
+  moodTag?: string | null;
   createdAt: string;
 }
 
@@ -235,6 +236,7 @@ function FeedContent() {
         content: post.content,
         restaurantId: post.restaurantId,
         restaurantName: post.restaurantName,
+        moodTag: post.moodTag ?? null,
         imageUrl: post.imageUrl,
         returnUrl: `${window.location.pathname}${window.location.search}`,
       }),

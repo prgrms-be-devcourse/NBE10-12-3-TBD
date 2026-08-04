@@ -83,6 +83,7 @@ interface FeedListPageResponse {
     createdAt: string;
     restaurantId?: number | null;
     restaurantName?: string | null;
+    moodTag?: string | null;
   }[];
 }
 
@@ -555,6 +556,7 @@ export default function ProfilePage() {
         content: post.content,
         restaurantId: post.restaurantId,
         restaurantName: post.restaurantName,
+        moodTag: post.moodTag ?? null,
         imageUrl: post.imageUrl,
         returnUrl: `${window.location.pathname}${window.location.search}`,
       }),

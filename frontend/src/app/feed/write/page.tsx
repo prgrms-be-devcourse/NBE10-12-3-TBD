@@ -41,6 +41,7 @@ interface EditingFeed {
   restaurantId: number | null;
   restaurantName: string | null;
   imageUrl?: string | null;
+  moodTag?: string | null;
   returnUrl?: string;
 }
 
@@ -102,6 +103,7 @@ function WritePostContent() {
       startTransition(() => {
         setContent(editingFeed.content);
         setFeedImagePreview(getImageUrl(editingFeed.imageUrl));
+        setSelectedMood((editingFeed.moodTag as MoodTagValue | null) ?? null);
 
         if (editingFeed.restaurantId && editingFeed.restaurantName) {
           setSelectedRestaurant({
@@ -346,6 +348,9 @@ function WritePostContent() {
 
     if (isEditMode) {
       formData.append("content", content.trim());
+      if (selectedMood) {
+        formData.append("moodTag", selectedMood);
+      }
       if (restaurantId !== null) {
         formData.append("restaurantId", String(restaurantId));
       }
