@@ -15,9 +15,9 @@ class RecommendationController(
 ) {
     @PostMapping("/api/v1/restaurants/recommend")
     fun recommend(@Valid @RequestBody request: RecommendRequest): RsData<RecommendResponse> {
-        val recommnedations = recommendService.recommend(request)
+        val recommendations = recommendService.recommend(request)
         return RsData.success(
-            RecommendResponse(recommnedations),
+            RecommendResponse(recommendations),
             "식당 추천이 완료되었습니다."
         )
     }
