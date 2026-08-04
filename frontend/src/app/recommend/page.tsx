@@ -666,7 +666,7 @@ export default function RecommendPage() {
       {/* Result modal */}
       {resultModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl bg-surface p-5 shadow-2xl animate-in fade-in-50 zoom-in-95 sm:p-8">
+          <div className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl bg-surface p-5 shadow-2xl animate-in fade-in-50 zoom-in-95 sm:p-8">
             <div className="mb-6 flex items-center justify-between border-b border-hairline-soft pb-3">
               <div className="text-center">
                 <p className="text-sm font-bold text-primary mb-1">오늘의 추천</p>
@@ -715,7 +715,7 @@ export default function RecommendPage() {
             ) : (
               <>
                 {/* Map */}
-                <div className="relative mb-5 h-40 w-full overflow-hidden rounded-2xl border border-hairline-soft sm:h-48">
+                <div className="relative mb-4 h-48 w-full overflow-hidden rounded-2xl border border-hairline-soft sm:h-56">
                   <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
                   <button
                     onClick={() => {
@@ -741,10 +741,10 @@ export default function RecommendPage() {
 
                 {/* Draft card */}
                 <div className="rounded-2xl bg-surface border border-hairline-soft overflow-hidden shadow-sm">
-                  <div className="aspect-[16/10] w-full bg-primary-soft flex items-center justify-center text-7xl">
+                  <div className="flex h-16 w-full items-center justify-center bg-primary-soft text-4xl sm:h-20">
                     {categoryEmoji[categoryLabel(current.category)] || "🍽\uFE0F"}
                   </div>
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary-active">
                         {categoryLabel(current.category)}
