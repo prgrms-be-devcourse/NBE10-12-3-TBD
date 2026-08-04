@@ -98,6 +98,27 @@ function FeedContent() {
   );
   const [openMenuFeedId, setOpenMenuFeedId] = useState<number | null>(null);
 
+  // 추천 탭에 보여줄 목록은 별도 state로 동기화하지 않고 매 렌더링마다 recommendPool에서
+  // 파생시킨다. state로 동기화하면(예전 방식) effect 안에서 posts/hasMore를 다시 계산해
+  // setState해야 하는데, 이러면 매 스크롤마다 렌더링이 한 번 더 발생하고, 같은 동기 실행
+  // 안에서 loadingMore를 true→false로 되돌리면 배칭 때문에 true인 상태가 화면에 반영조차
+  // 안 된다. recommendPool 자체가 이미 최신 진실이므로 그걸 그대로 잘라 쓰면 충분하다.
+  const recommendVisibleCount = (page + 1) * RECOMMEND_PAGE_SIZE;
+  const displayedPosts =
+    activeTab === "recommended"
+      ? recommendPool.slice(0, recommendVisibleCount)
+      : posts;
+  const canLoadMore =
+    activeTab === "recommended"
+      ? recommendVisibleCount < recommendPool.length
+      : hasMore;
+  // 추천 탭에서는 추천 푸디도 이미 받아온 recommendPool에서 그대로 파생시킨다. handleFollow가
+  // 팔로우 성공 시 recommendPool에서 그 작성자의 글을 지우므로, 이 값도 즉시 함께 갱신된다.
+  const displayedFoodies =
+    activeTab === "recommended" && currentUserId
+      ? pickUniqueFoodies(recommendPool, currentUserId)
+      : recommendFoodies;
+
   // highlight 파라미터가 있으면 해당 피드로 스크롤 + 하이라이트 (알림 클릭 진입)
   useEffect(() => {
     if (!highlightFeedId || loading) return;
@@ -107,7 +128,7 @@ function FeedContent() {
     el.classList.add("ring-2", "ring-primary");
     const timer = setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
     return () => clearTimeout(timer);
-  }, [highlightFeedId, loading, posts]);
+  }, [highlightFeedId, loading, displayedPosts]);
 
   const handleOpenComments = (feedId: number) => {
     setActiveCommentFeedId(feedId);
@@ -119,8 +140,8 @@ function FeedContent() {
     setActiveCommentFeedId(null);
   };
 
-  // 추천 탭은 스크롤 시 posts를 recommendPool에서 다시 잘라오므로, 좋아요/댓글/삭제 같은
-  // 변경은 posts뿐 아니라 recommendPool에도 반영해야 스크롤 후에도 유지된다.
+  // 추천 탭의 displayedPosts는 recommendPool에서 파생되므로, 좋아요/댓글/삭제 같은 변경은
+  // posts뿐 아니라 recommendPool에도 반영해야 화면에 그대로 유지된다.
   const updatePostEverywhere = (feedId: number, updater: (post: Feed) => Feed) => {
     const apply = (prev: Feed[]) =>
       prev.map((post) => (post.feedId === feedId ? updater(post) : post));
@@ -130,6 +151,15 @@ function FeedContent() {
 
   const removePostEverywhere = (feedId: number) => {
     const apply = (prev: Feed[]) => prev.filter((post) => post.feedId !== feedId);
+    setPosts(apply);
+    setRecommendPool(apply);
+  };
+
+  // 팔로우한 사용자의 글은 백엔드에서도 추천 후보에서 제외되므로, 팔로우 성공 시 프론트도
+  // posts/recommendPool에서 그 작성자의 글을 바로 지운다. 그대로 두면 좋아요/댓글 등
+  // 다른 변경으로 recommendPool이 갱신될 때 방금 팔로우한 사람이 추천 푸디에 재등장한다.
+  const removePostsByAuthorEverywhere = (userId: number) => {
+    const apply = (prev: Feed[]) => prev.filter((post) => post.userId !== userId);
     setPosts(apply);
     setRecommendPool(apply);
   };
@@ -213,13 +243,9 @@ function FeedContent() {
 
       if (res.ok && res.data) {
         setRecommendPool(res.data);
-        setPosts(res.data.slice(0, RECOMMEND_PAGE_SIZE));
-        setHasMore(res.data.length > RECOMMEND_PAGE_SIZE);
       } else {
         setError(res.message || "피드를 불러오지 못했습니다.");
         setRecommendPool([]);
-        setPosts([]);
-        setHasMore(false);
       }
 
       setLoading(false);
@@ -228,56 +254,27 @@ function FeedContent() {
     loadPool();
   }, [activeTab, recommendCursor]);
 
-  // 추천 탭에서 스크롤로 다음 페이지를 요청하면 이미 받아온 후보 묶음에서 잘라서 보여준다.
-  useEffect(() => {
-    if (activeTab !== "recommended" || page === 0 || recommendPool.length === 0) {
-      return;
-    }
-
-    const applyNextSlice = () => {
-      setLoadingMore(true);
-      const end = (page + 1) * RECOMMEND_PAGE_SIZE;
-      setPosts(recommendPool.slice(0, end));
-      setHasMore(end < recommendPool.length);
-      setLoadingMore(false);
-    };
-
-    applyNextSlice();
-  }, [activeTab, page, recommendPool]);
-
   const handleRefreshRecommend = () => {
     if (recommendPool.length === 0) return;
     const oldestFeedId = Math.min(...recommendPool.map((post) => post.feedId));
     setRecommendCursor(oldestFeedId);
     setRecommendPool([]);
-    setPosts([]);
-    setHasMore(true);
     setPage(0);
   };
 
-  // 추천 탭에서는 이미 recommendPool을 통해 같은 데이터를 받아뒀으므로, 추천 푸디만
-  // 뽑으려고 /recommend를 또 호출하지 않고 recommendPool을 재사용한다.
+  // 추천 탭은 displayedFoodies가 recommendPool에서 직접 파생하므로, 여기서는 팔로잉 탭에
+  // 표시할 추천 푸디만 네트워크로 받아온다.
   useEffect(() => {
-    if (!currentUserId) return;
-
-    const applyFoodiesFromPool = (pool: Feed[]) => {
-      setRecommendFoodies(pickUniqueFoodies(pool, currentUserId));
-    };
-
-    if (activeTab === "recommended") {
-      if (recommendPool.length === 0) return;
-      applyFoodiesFromPool(recommendPool);
-      return;
-    }
+    if (!currentUserId || activeTab === "recommended") return;
 
     const loadFoodies = async () => {
       const res = await apiFetchJson<Feed[]>("/api/v1/feeds/recommend");
       if (!res.ok || !res.data) return;
-      applyFoodiesFromPool(res.data);
+      setRecommendFoodies(pickUniqueFoodies(res.data, currentUserId));
     };
 
     loadFoodies();
-  }, [currentUserId, activeTab, recommendPool]);
+  }, [currentUserId, activeTab]);
 
   const handleFollow = async (userId: number) => {
     const res = await apiFetchJson(`/api/v1/follows/${userId}`, {
@@ -285,6 +282,7 @@ function FeedContent() {
     });
 
     if (res.ok) {
+      removePostsByAuthorEverywhere(userId);
       setRecommendFoodies((prev) => prev.filter((f) => f.userId !== userId));
       window.dispatchEvent(new Event("follow-state-change"));
     } else {
@@ -355,7 +353,7 @@ function FeedContent() {
       if (
         window.innerHeight + window.scrollY >=
           document.body.offsetHeight - 200 &&
-        hasMore &&
+        canLoadMore &&
         !loading &&
         !loadingMore
       ) {
@@ -365,7 +363,7 @@ function FeedContent() {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [hasMore, loading, loadingMore]);
+  }, [canLoadMore, loading, loadingMore]);
 
   return (
     <AppShell
@@ -374,10 +372,10 @@ function FeedContent() {
           <SidebarProfile />
           <SidebarCard title="추천 푸디">
             <div className="space-y-4">
-              {recommendFoodies.length === 0 ? (
+              {displayedFoodies.length === 0 ? (
                 <p className="text-sm text-muted">추천 푸디가 없습니다.</p>
               ) : (
-                recommendFoodies.map((f) => (
+                displayedFoodies.map((f) => (
                   <div
                     key={f.userId}
                     className="flex items-center justify-between group"
@@ -458,7 +456,7 @@ function FeedContent() {
           <p className="py-10 text-center text-sm text-red-500">{error}</p>
         ) : (
           <div className="space-y-4">
-            {posts.map((post) => (
+            {displayedPosts.map((post) => (
               <article
                 key={post.feedId}
                 id={`feed-${post.feedId}`}
@@ -591,9 +589,9 @@ function FeedContent() {
               </div>
             )}
             {!loadingMore &&
-              !hasMore &&
+              !canLoadMore &&
               activeTab === "recommended" &&
-              posts.length > 0 && (
+              displayedPosts.length > 0 && (
                 <div className="flex flex-col items-center gap-2 py-6">
                   <p className="text-sm text-muted">
                     새로운 추천을 더 받아볼까요?
