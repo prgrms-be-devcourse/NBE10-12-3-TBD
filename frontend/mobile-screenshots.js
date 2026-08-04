@@ -50,6 +50,19 @@ const PAGES = [
         return;
       }
 
+      // 크로스 오리진(localhost:8080)이라 CORS 헤더가 없으면 브라우저가 차단함
+      const corsHeaders = {
+        "Access-Control-Allow-Origin": "http://localhost:3000",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+      };
+
+      if (req.method() === "OPTIONS") {
+        req.respond({ status: 204, headers: corsHeaders });
+        return;
+      }
+
       let data = [];
       if (url.includes("/feeds")) {
         data = { feeds: [], totalPages: 0, totalElements: 0, page: 0, size: 10 };
@@ -72,6 +85,7 @@ const PAGES = [
       req.respond({
         status: 200,
         contentType: "application/json",
+        headers: corsHeaders,
         body: JSON.stringify({ success: true, data, message: "" }),
       });
     });

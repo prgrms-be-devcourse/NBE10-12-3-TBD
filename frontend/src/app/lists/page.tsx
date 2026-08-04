@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
+  ArrowLeft,
   Bookmark,
   MapPin,
   Pencil,
@@ -1232,6 +1233,41 @@ function ListsPage() {
     confirmAction?.type === "deleteList";
 
   /* =========================================================
+   * 사이드바/흡수 섹션 공유 리스트 카드 버튼
+   * ========================================================= */
+
+  /** 사이드바(데스크톱)와 흡수 섹션(모바일)에서 공유하는 리스트 카드 버튼 */
+  const renderSidebarListButton = (
+    list: ListSummary,
+    options?: { showSaveCount?: boolean },
+  ) => (
+    <button
+      key={list.id}
+      type="button"
+      onClick={() => handleSelectSidebarList(list.id)}
+      className="block w-full rounded-xl bg-surface-soft p-4 text-left transition-colors hover:bg-hairline-soft/50"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-base font-bold text-ink">{list.title}</p>
+
+        <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
+          {list.moodTag}
+        </span>
+      </div>
+
+      <p className="mt-1.5 text-sm text-muted">
+        by {list.nickname} · 식당 {list.itemCount}개
+      </p>
+
+      {options?.showSaveCount && "saveCount" in list && (
+        <p className="mt-1 text-xs font-semibold text-primary">
+          {(list as PopularListSummary).saveCount}명이 저장
+        </p>
+      )}
+    </button>
+  );
+
+  /* =========================================================
    * 일반 리스트 카드
    * ========================================================= */
 
@@ -1352,32 +1388,9 @@ function ListsPage() {
                   {popularError ? (
                     <p className="py-2 text-sm text-red-500">{popularError}</p>
                   ) : (
-                    popularLists.map((list) => (
-                      <button
-                        key={list.id}
-                        type="button"
-                        onClick={() => handleSelectSidebarList(list.id)}
-                        className="block w-full rounded-xl bg-surface-soft p-4 text-left transition-colors hover:bg-hairline-soft/50"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-base font-bold text-ink">
-                            {list.title}
-                          </p>
-
-                          <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                            {list.moodTag}
-                          </span>
-                        </div>
-
-                        <p className="mt-1.5 text-sm text-muted">
-                          by {list.nickname} · 식당 {list.itemCount}개
-                        </p>
-
-                        <p className="mt-1 text-xs font-semibold text-primary">
-                          {list.saveCount}명이 저장
-                        </p>
-                      </button>
-                    ))
+                    popularLists.map((list) =>
+                      renderSidebarListButton(list, { showSaveCount: true }),
+                    )
                   )}
                 </div>
               </SidebarCard>
@@ -1390,28 +1403,7 @@ function ListsPage() {
                     최근 생성된 리스트가 없습니다.
                   </p>
                 ) : (
-                  recentLists.map((list) => (
-                    <button
-                      key={list.id}
-                      type="button"
-                      onClick={() => handleSelectSidebarList(list.id)}
-                      className="block w-full rounded-xl bg-surface-soft p-4 text-left transition-colors hover:bg-hairline-soft/50"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-base font-bold text-ink">
-                          {list.title}
-                        </p>
-
-                        <span className="shrink-0 rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                          {list.moodTag}
-                        </span>
-                      </div>
-
-                      <p className="mt-1.5 text-sm text-muted">
-                        by {list.nickname} · 식당 {list.itemCount}개
-                      </p>
-                    </button>
-                  ))
+                  recentLists.map((list) => renderSidebarListButton(list))
                 )}
               </div>
             </SidebarCard>
@@ -1446,7 +1438,7 @@ function ListsPage() {
                * 왼쪽 리스트 목록
                * ================================================= */}
 
-              <div className="min-w-0 space-y-3">
+              <div className={`min-w-0 space-y-3 ${selectedId !== null ? "hidden xl:block" : ""}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
@@ -1545,6 +1537,33 @@ function ListsPage() {
                     )}
                   </>
                 )}
+
+                {/* 사이드바 콘텐츠 흡수 (xl 미만) */}
+                {(popularLists.length > 0 || popularError) && (
+                  <div className="pt-4 xl:hidden">
+                    <p className="mb-3 text-base font-bold text-ink">인기 맛집 리스트</p>
+
+                    <div className="space-y-3">
+                      {popularError ? (
+                        <p className="py-2 text-sm text-red-500">{popularError}</p>
+                      ) : (
+                        popularLists.map((list) =>
+                          renderSidebarListButton(list, { showSaveCount: true }),
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {recentLists.length > 0 && (
+                  <div className="pt-4 xl:hidden">
+                    <p className="mb-3 text-base font-bold text-ink">최근 생성된 리스트</p>
+
+                    <div className="space-y-3">
+                      {recentLists.map((list) => renderSidebarListButton(list))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* =================================================
@@ -1553,8 +1572,25 @@ function ListsPage() {
 
               <div
                 ref={detailPanelRef}
-                className="scroll-mt-28 min-h-[680px] min-w-0 overflow-hidden rounded-2xl border border-hairline-soft bg-surface"
+                className={`scroll-mt-28 min-h-0 min-w-0 overflow-hidden rounded-2xl border border-hairline-soft bg-surface xl:min-h-[680px] ${
+                  selectedId === null ? "hidden xl:block" : ""
+                }`}
               >
+                <div className="px-6 pt-4 xl:hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(null);
+                      setSelectedDetail(null);
+                      setMapError("");
+                    }}
+                    className="flex items-center gap-1.5 text-sm font-bold text-muted transition-colors hover:text-ink"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    목록으로
+                  </button>
+                </div>
+
                 {selectedDetail ? (
                   <>
                     <div className="flex flex-col gap-4 border-b border-hairline-soft p-6 sm:flex-row sm:items-start sm:justify-between">
@@ -1827,10 +1863,10 @@ function ListsPage() {
                             </span>
                           </div>
 
-                          <div className="relative min-h-[600px] overflow-hidden rounded-2xl border border-hairline-soft">
+                          <div className="relative min-h-[400px] overflow-hidden rounded-2xl border border-hairline-soft xl:min-h-[600px]">
                             <div
                               ref={mapContainerRef}
-                              className="h-[600px] w-full"
+                              className="h-[400px] w-full xl:h-[600px]"
                             />
 
                             {mapError && (
@@ -1845,6 +1881,10 @@ function ListsPage() {
                       </div>
                     )}
                   </>
+                ) : selectedId !== null ? (
+                  <p className="py-24 text-center text-base text-muted">
+                    리스트를 불러오는 중입니다...
+                  </p>
                 ) : (
                   <p className="py-24 text-center text-base text-muted">
                     리스트를 선택해주세요
