@@ -130,8 +130,17 @@ class RestaurantListService(
     // ============================== 전체 조회 =================================
     // 전체 맛집 리스트 다건 조회
     @Transactional(readOnly = true)
-    fun findAll(pageable: Pageable): Page<RestaurantList> {
-        return restaurantListRepository.findAll(pageable)
+    fun findAll(moodTag: MoodTag?, pageable: Pageable): Page<RestaurantList> {
+        return if (moodTag == null) {
+            restaurantListRepository.findAll(pageable)
+        } else {
+            restaurantListRepository.findAllByMoodTag(moodTag, pageable)
+        }
+    }
+
+    @Transactional(readOnly = true)
+    fun findPublicByUserId(userId: Long, pageable: Pageable): Page<RestaurantList> {
+        return restaurantListRepository.findByUserId(userId, pageable)
     }
 
     // 전체 식당 리스트 단건 조회
@@ -223,9 +232,14 @@ class RestaurantListService(
     @Transactional(readOnly = true)
     fun findAllExceptUser(
         userId: Long,
+        moodTag: MoodTag?,
         pageable: Pageable
     ): Page<RestaurantList> {
-        return restaurantListRepository.findByUserIdNot(userId, pageable)
+        return if (moodTag == null) {
+            restaurantListRepository.findByUserIdNot(userId, pageable)
+        } else {
+            restaurantListRepository.findByUserIdNotAndMoodTag(userId, moodTag, pageable)
+        }
     }
 
     @Transactional(readOnly = true)

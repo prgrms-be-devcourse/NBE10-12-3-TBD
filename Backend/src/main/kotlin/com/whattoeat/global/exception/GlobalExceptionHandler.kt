@@ -142,6 +142,10 @@ class GlobalExceptionHandler {
     fun handleInvalidImageFormat(e: InvalidImageFormatException): ResponseEntity<ErrorResponse> =
         badRequest(e.message)
 
+    @ExceptionHandler(InvalidRecommendParameterException::class)
+    fun handleInvalidRecommendParameter(e: InvalidRecommendParameterException): ResponseEntity<ErrorResponse> =
+        badRequest(e.message)
+    
     private fun notFound(message: String?): ResponseEntity<ErrorResponse> =
         status(HttpStatus.NOT_FOUND, message)
 

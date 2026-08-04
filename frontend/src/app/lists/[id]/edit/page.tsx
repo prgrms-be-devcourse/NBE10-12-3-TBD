@@ -18,6 +18,9 @@ import {
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 
 import { apiFetchJson } from "@/lib/api";
+import { KAKAO_JS_KEY } from "@/lib/kakao";
+import { MOOD_TAGS } from "@/lib/mood";
+import { buildListHref } from "@/lib/listNavigation";
 
 /* =========================================================
  * Kakao 검색 결과 원본
@@ -125,10 +128,10 @@ interface RestaurantResponse {
 }
 
 /* =========================================================
- * 분위기
+ * 분위기 — 공용 MOOD_TAGS 사용 (백엔드 enum 6종과 동일)
  * ========================================================= */
 
-const moodTags = ["SOLO", "DATE", "FAMILY", "HEALING"];
+const moodTags = MOOD_TAGS;
 
 /* =========================================================
  * 음식점 / 카페만 남김
@@ -209,7 +212,7 @@ export default function ListEditPage() {
 
   const listId = Number(params.id);
 
-  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY;
+  const kakaoKey = KAKAO_JS_KEY;
 
   /* =======================================================
    * 리스트 기본 정보
@@ -329,7 +332,7 @@ export default function ListEditPage() {
     if (moveAfterAlert) {
       setMoveAfterAlert(false);
 
-      router.push(`/lists?listId=${listId}`);
+      router.push(buildListHref(listId, "my"));
     }
   };
 
@@ -839,6 +842,12 @@ export default function ListEditPage() {
       return;
     }
 
+    if (items.length === 0) {
+      showAlert("리스트에는 식당이 한 개 이상 필요합니다.");
+
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -1074,8 +1083,8 @@ export default function ListEditPage() {
                     className="w-full rounded-xl border border-hairline bg-surface-soft px-4 py-3 text-sm outline-none focus:border-primary"
                   >
                     {moodTags.map((tag) => (
-                      <option key={tag} value={tag}>
-                        {tag}
+                      <option key={tag.value} value={tag.value}>
+                        {tag.label}
                       </option>
                     ))}
                   </select>

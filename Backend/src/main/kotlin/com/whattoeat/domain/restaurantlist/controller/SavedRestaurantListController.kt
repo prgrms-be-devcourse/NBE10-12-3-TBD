@@ -8,6 +8,7 @@ import com.whattoeat.global.security.CustomUserDetails
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
@@ -56,7 +57,14 @@ class SavedRestaurantListController(
     ) : ResponseEntity<RsData<Page<SavedRestaurantListResponse>>> {
         val userId = userDetails.userId
 
-        val pageable = PageRequest.of(page, size)
+        val pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
 
         val response = savedRestaurantListService.findMySavedLists(userId, pageable)
 

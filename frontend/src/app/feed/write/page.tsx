@@ -7,8 +7,8 @@ import { ArrowLeft, X, ImagePlus, Send, Lightbulb, Search } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { apiFetch, apiFetchJson, getImageUrl } from "@/lib/api";
 import { resizeImageToInstagram } from "@/lib/image";
-
-const moods = ["혼밥", "데이트", "회식", "가족", "친구"];
+import { KAKAO_JS_KEY } from "@/lib/kakao";
+import { MOOD_TAGS, type MoodTagValue } from "@/lib/mood";
 
 interface KakaoRestaurant {
   kakaoPlaceId: string;
@@ -42,6 +42,7 @@ interface EditingFeed {
   restaurantId: number | null;
   restaurantName: string | null;
   imageUrl?: string | null;
+  moodTag?: string | null;
   returnUrl?: string;
 }
 
@@ -57,12 +58,10 @@ function WritePostContent() {
   const editFeedId = searchParams.get("edit");
   const isEditMode = Boolean(editFeedId);
 
-  const kakaoKey =
-    process.env.NEXT_PUBLIC_KAKAO_JS_KEY ||
-    process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY;
+  const kakaoKey = KAKAO_JS_KEY;
 
   const [content, setContent] = useState("");
-  const [selectedMood, setSelectedMood] = useState("혼밥");
+  const [selectedMood, setSelectedMood] = useState<MoodTagValue | null>(null);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<KakaoRestaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] =
@@ -103,6 +102,7 @@ function WritePostContent() {
       startTransition(() => {
         setContent(editingFeed.content);
         setFeedImagePreview(getImageUrl(editingFeed.imageUrl));
+        setSelectedMood((editingFeed.moodTag as MoodTagValue | null) ?? null);
 
         if (editingFeed.restaurantId && editingFeed.restaurantName) {
           setSelectedRestaurant({
@@ -347,6 +347,9 @@ function WritePostContent() {
 
     if (isEditMode) {
       formData.append("content", content.trim());
+      if (selectedMood) {
+        formData.append("moodTag", selectedMood);
+      }
       if (restaurantId !== null) {
         formData.append("restaurantId", String(restaurantId));
       }
@@ -359,9 +362,12 @@ function WritePostContent() {
     } else {
       formData.append(
         "feed",
-        new Blob([JSON.stringify({ content: content.trim(), restaurantId })], {
-          type: "application/json",
-        }),
+        new Blob(
+          [JSON.stringify({ content: content.trim(), restaurantId, moodTag: selectedMood })],
+          {
+            type: "application/json",
+          },
+        ),
       );
       if (feedImageFile) {
         formData.append("image", feedImageFile);
@@ -526,18 +532,20 @@ function WritePostContent() {
               분위기 태그
             </label>
             <div className="flex flex-wrap gap-2">
-              {moods.map((mood) => (
+              {MOOD_TAGS.map((tag) => (
                 <button
-                  key={mood}
+                  key={tag.value}
                   type="button"
-                  onClick={() => setSelectedMood(mood)}
+                  onClick={() =>
+                    setSelectedMood(selectedMood === tag.value ? null : tag.value)
+                  }
                   className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
-                    selectedMood === mood
+                    selectedMood === tag.value
                       ? "bg-primary text-white"
                       : "bg-surface-soft text-muted hover:bg-hairline-soft"
                   }`}
                 >
-                  {mood}
+                  {tag.label}
                 </button>
               ))}
             </div>

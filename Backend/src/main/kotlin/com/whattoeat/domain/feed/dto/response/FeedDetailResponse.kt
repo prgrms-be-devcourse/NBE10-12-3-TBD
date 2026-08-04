@@ -1,6 +1,7 @@
 package com.whattoeat.domain.feed.dto.response
 
 import com.whattoeat.domain.feed.entity.Feed
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import java.time.LocalDateTime
 
 @JvmRecord
@@ -15,6 +16,7 @@ data class FeedDetailResponse(
     val updatedAt: LocalDateTime?,
     val restaurantId: Long?,
     val restaurantName: String?,
+    val moodTag: MoodTag?,
 ) {
     companion object {
         @JvmStatic
@@ -30,6 +32,7 @@ data class FeedDetailResponse(
                 feed.updatedAt,
                 feed.restaurant?.id,
                 feed.restaurant?.name,
+                feed.moodTag,
             )
     }
 }

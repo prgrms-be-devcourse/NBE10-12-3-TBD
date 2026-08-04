@@ -5,6 +5,7 @@ import com.whattoeat.domain.feed.dto.request.FeedUpdateRequest
 import com.whattoeat.domain.feed.dto.response.FeedDetailResponse
 import com.whattoeat.domain.feed.dto.response.FeedListPageResponse
 import com.whattoeat.domain.feed.service.FeedService
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.global.rsData.RsData
 import com.whattoeat.global.security.CustomUserDetails
 import jakarta.validation.Valid
@@ -77,9 +78,10 @@ class FeedController(
         @RequestParam("content") content: String,
         @RequestParam(value = "restaurantId", required = false) restaurantId: Long?,
         @RequestParam(value = "deleteImage", required = false, defaultValue = "false") deleteImage: Boolean,
+        @RequestParam(value = "moodTag", required = false) moodTag: MoodTag?,
         @RequestPart(value = "image", required = false) image: MultipartFile?,
     ): RsData<FeedDetailResponse> {
-        val feedUpdateRequest = FeedUpdateRequest(content, restaurantId, deleteImage)
+        val feedUpdateRequest = FeedUpdateRequest(content, restaurantId, deleteImage, moodTag)
         val response = feedService.updateFeed(id, userDetails.userId, feedUpdateRequest, image)
         return RsData.success(response, "피드가 수정되었습니다.")
     }

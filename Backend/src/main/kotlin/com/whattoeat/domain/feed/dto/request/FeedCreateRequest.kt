@@ -1,6 +1,7 @@
 package com.whattoeat.domain.feed.dto.request
 
 import com.whattoeat.domain.feed.entity.Feed
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import com.whattoeat.domain.restaurant.entity.Restaurant
 import com.whattoeat.domain.user.entity.User
 import jakarta.validation.constraints.NotBlank
@@ -14,6 +15,7 @@ data class FeedCreateRequest(
     val content: String,
     @field:Positive(message = "음수 Id는 올 수 없습니다.")
     val restaurantId: Long?,
+    val moodTag: MoodTag?,
 ) {
     fun toEntity(user: User, restaurant: Restaurant?, imageUrl: String?): Feed =
         Feed.builder()
@@ -21,5 +23,6 @@ data class FeedCreateRequest(
             .restaurant(restaurant)
             .content(content)
             .imageUrl(imageUrl)
+            .moodTag(moodTag)
             .build()
 }

@@ -1,6 +1,7 @@
 package com.whattoeat.domain.feed.dto.response
 
 import com.whattoeat.domain.feed.entity.Feed
+import com.whattoeat.domain.restaurant.entity.MoodTag
 import java.time.LocalDateTime
 
 @JvmRecord
@@ -18,6 +19,7 @@ data class FeedListResponse(
     // id만 있으면 추가 API 호출로 피드 목록 로딩이 느려지고, 반대로 name만 있으면 링크 불가
     val restaurantId: Long?,
     val restaurantName: String?,
+    val moodTag: MoodTag?,
     val createdAt: LocalDateTime?,
 ) {
     companion object {
@@ -35,6 +37,7 @@ data class FeedListResponse(
                 commentCount,
                 feed.restaurant?.id,
                 feed.restaurant?.name,
+                feed.moodTag,
                 feed.createdAt,
             )
     }
