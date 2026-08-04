@@ -13,6 +13,7 @@ import org.mockito.Mockito.mock
 import org.springframework.core.MethodParameter
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.test.web.servlet.MockMvc
@@ -148,7 +149,14 @@ class SavedRestaurantListControllerTest {
             LocalDateTime.of(2026, 7, 4, 2, 30)
         )
 
-        val pageable = PageRequest.of(0, 10)
+        val pageable = PageRequest.of(
+            0,
+            10,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
 
         val page = PageImpl(
             listOf(response),
