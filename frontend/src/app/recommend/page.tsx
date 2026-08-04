@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import AppShell, { SidebarProfile, SidebarCard } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
+import { MOOD_TAGS } from "@/lib/mood";
 import regionsData from "@/data/regions.json";
 
 const categories = ["한식", "일식", "양식", "중식", "분식", "카페", "치킨", "패스트푸드", "술집", "뷔페", "샤브샤브", "퓨전요리", "아시안", "기타"];
@@ -460,6 +461,7 @@ export default function RecommendPage() {
                 lng: r.lng,
               })),
               category: selectedCategory !== "기타" ? categoryToEnum[selectedCategory] : null,
+              mood: MOOD_TAGS.find((t) => t.label === selectedMood)?.value ?? null,
               sort: sortBy === "distance" ? "DISTANCE" : "RANDOM",
               lat: position?.lat ?? null,
               lng: position?.lng ?? null,
