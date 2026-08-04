@@ -34,18 +34,19 @@ internal class FollowRepositoryTest {
         entityManager.persistAndFlush(Follow.of(follower, following))
 
     @Test
-    fun findFollowingIdsByFollowerIds_authorIds_범위_밖의_팔로우는_조회되지_않는다() {
+    fun findSecondDegreeAuthorIds_authorIds_범위_밖의_2차_팔로우는_조회되지_않는다() {
         val me = createAndSaveUser("me", "me", "me@test.com")
         val friend = createAndSaveUser("friend", "friend", "friend@test.com")
         val candidateAuthor = createAndSaveUser("candidateAuthor", "candidateAuthor", "candidate@test.com")
         val outOfRangeAuthor = createAndSaveUser("outOfRangeAuthor", "outOfRangeAuthor", "outofrange@test.com")
 
+        createAndSaveFollow(me, friend)
         createAndSaveFollow(friend, candidateAuthor)
         createAndSaveFollow(friend, outOfRangeAuthor)
 
         val result =
-            followRepository.findFollowingIdsByFollowerIds(
-                followerIds = listOf(requireNotNull(friend.id)),
+            followRepository.findSecondDegreeAuthorIds(
+                userId = requireNotNull(me.id),
                 authorIds = listOf(requireNotNull(candidateAuthor.id)),
             )
 
@@ -53,16 +54,17 @@ internal class FollowRepositoryTest {
     }
 
     @Test
-    fun findFollowingIdsByFollowerIds_followerIds에_없는_사람의_팔로우는_조회되지_않는다() {
-        val friend = createAndSaveUser("friend", "friend", "friend@test.com")
+    fun findSecondDegreeAuthorIds_내가_팔로우하지_않는_사람을_거친_2차_팔로우는_조회되지_않는다() {
+        val me = createAndSaveUser("me", "me", "me@test.com")
         val stranger = createAndSaveUser("stranger", "stranger", "stranger@test.com")
         val candidateAuthor = createAndSaveUser("candidateAuthor", "candidateAuthor", "candidate@test.com")
 
+        // me는 stranger를 팔로우하지 않으므로, stranger가 팔로우하는 사람은 me의 2차 팔로우가 아니다.
         createAndSaveFollow(stranger, candidateAuthor)
 
         val result =
-            followRepository.findFollowingIdsByFollowerIds(
-                followerIds = listOf(requireNotNull(friend.id)),
+            followRepository.findSecondDegreeAuthorIds(
+                userId = requireNotNull(me.id),
                 authorIds = listOf(requireNotNull(candidateAuthor.id)),
             )
 

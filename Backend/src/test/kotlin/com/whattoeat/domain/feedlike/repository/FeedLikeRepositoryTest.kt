@@ -2,6 +2,7 @@ package com.whattoeat.domain.feedlike.repository
 
 import com.whattoeat.domain.feed.entity.Feed
 import com.whattoeat.domain.feedlike.entity.FeedLike
+import com.whattoeat.domain.follow.entity.Follow
 import com.whattoeat.domain.user.entity.Provider
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.global.config.JpaConfig
@@ -42,10 +43,15 @@ internal class FeedLikeRepositoryTest {
     private fun createAndSaveLike(feed: Feed, user: User): FeedLike =
         entityManager.persistAndFlush(FeedLike.of(feed, user))
 
+    private fun createAndSaveFollow(follower: User, following: User): Follow =
+        entityManager.persistAndFlush(Follow.of(follower, following))
+
     @Test
-    fun findFeedIdsLikedByUserIds_feedIds_범위_밖의_좋아요는_조회되지_않는다() {
+    fun findFeedIdsLikedByFollowingOf_feedIds_범위_밖의_좋아요는_조회되지_않는다() {
+        val me = createAndSaveUser("me", "me", "me@test.com")
         val liker = createAndSaveUser("liker", "liker", "liker@test.com")
         val author = createAndSaveUser("author", "author", "author@test.com")
+        createAndSaveFollow(me, liker)
 
         val candidateFeed = createAndSaveFeed(author, "후보 피드")
         val outOfRangeFeed = createAndSaveFeed(author, "후보 범위 밖 피드")
@@ -54,8 +60,8 @@ internal class FeedLikeRepositoryTest {
         createAndSaveLike(outOfRangeFeed, liker)
 
         val result =
-            feedLikeRepository.findFeedIdsLikedByUserIds(
-                userIds = listOf(requireNotNull(liker.id)),
+            feedLikeRepository.findFeedIdsLikedByFollowingOf(
+                userId = requireNotNull(me.id),
                 feedIds = listOf(requireNotNull(candidateFeed.id)),
             )
 
@@ -63,8 +69,8 @@ internal class FeedLikeRepositoryTest {
     }
 
     @Test
-    fun findFeedIdsLikedByUserIds_userIds에_없는_사람의_좋아요는_조회되지_않는다() {
-        val liker = createAndSaveUser("liker", "liker", "liker@test.com")
+    fun findFeedIdsLikedByFollowingOf_내가_팔로우하지_않는_사람의_좋아요는_조회되지_않는다() {
+        val me = createAndSaveUser("me", "me", "me@test.com")
         val stranger = createAndSaveUser("stranger", "stranger", "stranger@test.com")
         val author = createAndSaveUser("author", "author", "author@test.com")
 
@@ -72,8 +78,8 @@ internal class FeedLikeRepositoryTest {
         createAndSaveLike(feed, stranger)
 
         val result =
-            feedLikeRepository.findFeedIdsLikedByUserIds(
-                userIds = listOf(requireNotNull(liker.id)),
+            feedLikeRepository.findFeedIdsLikedByFollowingOf(
+                userId = requireNotNull(me.id),
                 feedIds = listOf(requireNotNull(feed.id)),
             )
 

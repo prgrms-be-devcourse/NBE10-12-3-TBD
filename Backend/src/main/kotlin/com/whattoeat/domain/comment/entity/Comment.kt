@@ -6,7 +6,13 @@ import com.whattoeat.global.entity.BaseEntity
 import jakarta.persistence.*
 
 @Entity
-@Table(name = "feed_comment")
+@Table(
+    name = "feed_comment",
+    indexes = [
+        Index(name = "idx_feed_comment_feed_id", columnList = "feed_id"),
+        Index(name = "idx_feed_comment_user_id", columnList = "user_id"),
+    ],
+)
 class Comment(
     feed: Feed,
     user: User,

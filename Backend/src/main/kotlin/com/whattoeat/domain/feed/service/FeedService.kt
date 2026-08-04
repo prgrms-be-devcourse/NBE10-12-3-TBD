@@ -137,16 +137,10 @@ import org.springframework.web.multipart.MultipartFile
 
     @Transactional(readOnly = true)
      fun getFollowingFeeds(userId: Long, pageable: Pageable): Page<FeedListResponse> {
-        val followingUserIds =
-            followRepository
-                .findByFollower_Id(userId, Pageable.unpaged())
-                .content
-                .map { it.following.id!! }
-
-        // 팔로잉 탭에는 내가 팔로우하는 사람들의 글뿐 아니라 내 글도 함께 노출한다.
-        val authorIds = (followingUserIds + userId).toHashSet()
-
-        val feeds = feedRepository.findByUser_IdInOrderByIdDesc(authorIds, pageable)
+        // 팔로잉 탭에는 내가 팔로우하는 사람들의 글뿐 아니라 내 글도 함께 노출한다. 팔로우
+        // 목록을 Java로 가져와 IN 파라미터로 넘기지 않고, 팔로우 여부 자체를 쿼리 안에서
+        // EXISTS로 판정하므로 팔로우 수가 아무리 많아도 메모리에 올리지 않는다.
+        val feeds = feedRepository.findFollowingFeeds(userId, pageable)
         val feedContents = feeds.content
         val commentCounts = countCommentByFeedIds(feedContents)
         val likedFeedIds = findLikedFeedIds(userId, feedContents)
@@ -164,26 +158,12 @@ import org.springframework.web.multipart.MultipartFile
      fun getRecommendedFeeds(userId: Long?, beforeFeedId: Long? = null): List<FeedListResponse> {
         if (userId == null) return emptyList()
 
-        val followingUserIds =
-            followRepository
-                .findByFollower_Id(userId, Pageable.unpaged())
-                .content
-                .map { it.following.id!! }
-
-        // 팔로우 탭(getFollowingFeeds)에서 이미 보여주는 글이므로 추천 후보에서는 나 자신과
-        // 내가 팔로우하는 사람들의 글을 모두 제외한다.
-        val excludedUserIds = (followingUserIds + userId).toHashSet()
-
-        // beforeFeedId가 주어지면(새로고침) 이전 배치보다 오래된 다음 300개를 후보로 가져온다.
+        // 추천 후보: 나 자신도 아니고 내가 팔로우하는 사람도 아닌 글(팔로우 탭에서 이미 보여주므로).
+        // 팔로우 목록을 Java로 가져와 NOT IN 파라미터로 넘기지 않고, 쿼리 안에서 EXISTS로
+        // 판정하므로 팔로우 수가 아무리 많아도 메모리/파라미터 폭발이 없다. beforeFeedId가
+        // 주어지면(새로고침) 이전 배치보다 오래된 다음 300개를 후보로 가져온다.
         val candidatePage = PageRequest.of(0, RECOMMEND_CANDIDATE_LIMIT)
-        val candidates =
-            if (beforeFeedId == null) {
-                feedRepository.findByUser_IdNotInOrderByIdDesc(excludedUserIds, candidatePage).content
-            } else {
-                feedRepository
-                    .findByUser_IdNotInAndIdLessThanOrderByIdDesc(excludedUserIds, beforeFeedId, candidatePage)
-                    .content
-            }
+        val candidates = feedRepository.findRecommendCandidates(userId, beforeFeedId, candidatePage)
 
         if (candidates.isEmpty()) {
             return emptyList()
@@ -194,31 +174,29 @@ import org.springframework.web.multipart.MultipartFile
         val commentCounts = countCommentByFeedIds(candidates)
         val likedFeedIds = findLikedFeedIds(userId, candidates)
 
-        // 내가 팔로우하는 사람들이 팔로우하는 사람(2차 팔로우)의 글, 그리고 그들이 좋아요한 글을 가산점 신호로 사용한다.
-        // 지금 후보(candidateAuthorIds)의 작성자인지만 필요하므로 팔로우 그래프 전체가 아니라 그 범위로 제한한다.
+        // 내가 팔로우하는 사람들이 팔로우하는 사람(2차 팔로우)의 글, 그리고 그들이 좋아요한 글을
+        // 가산점 신호로 사용한다. 여기서도 내 팔로우 목록을 미리 가져오지 않고, 지금 후보
+        // (candidateAuthorIds/candidateIds)로 범위를 좁힌 채 DB에서 직접 판정한다.
         val secondDegreeAuthorIds =
-            if (followingUserIds.isEmpty()) {
-                emptySet()
-            } else {
-                followRepository.findFollowingIdsByFollowerIds(followingUserIds, candidateAuthorIds).toHashSet()
-            }
+            followRepository.findSecondDegreeAuthorIds(userId, candidateAuthorIds).toHashSet()
         val likedByFollowingFeedIds =
-            if (followingUserIds.isEmpty()) {
-                emptySet()
-            } else {
-                // 지금 후보(candidateIds)에 없는 글까지 조회할 필요가 없으므로 후보 범위로 제한한다.
-                feedLikeRepository.findFeedIdsLikedByUserIds(followingUserIds, candidateIds).toHashSet()
-            }
+            feedLikeRepository.findFeedIdsLikedByFollowingOf(userId, candidateIds).toHashSet()
 
-        val ranked =
-            candidates.sortedByDescending { feed ->
-                recommendationScore(
-                    feed = feed,
-                    commentCount = commentCounts.getOrDefault(feed.id, 0L),
-                    isFromSecondDegreeFollowing = secondDegreeAuthorIds.contains(feed.user.id),
-                    isLikedByFollowing = likedByFollowingFeedIds.contains(feed.id),
-                )
+        // sortedByDescending은 정렬 비교마다 selector를 다시 호출하므로, recommendationScore를
+        // 그 자리에서 계산하면 O(n) 대신 O(n log n)번 호출된다. 점수를 먼저 한 번씩만 계산해 둔다.
+        val now = LocalDateTime.now()
+        val scoredCandidates =
+            candidates.map { feed ->
+                feed to
+                    recommendationScore(
+                        feed = feed,
+                        commentCount = commentCounts.getOrDefault(feed.id, 0L),
+                        isFromSecondDegreeFollowing = secondDegreeAuthorIds.contains(feed.user.id),
+                        isLikedByFollowing = likedByFollowingFeedIds.contains(feed.id),
+                        now = now,
+                    )
             }
+        val ranked = scoredCandidates.sortedByDescending { (_, score) -> score }.map { (feed, _) -> feed }
 
         val spotlightFeeds = pickSpotlightFeeds(candidates)
         val finalOrder = interleaveSpotlightFeeds(ranked, spotlightFeeds)
@@ -305,6 +283,7 @@ import org.springframework.web.multipart.MultipartFile
         commentCount: Long,
         isFromSecondDegreeFollowing: Boolean,
         isLikedByFollowing: Boolean,
+        now: LocalDateTime,
     ): Double {
         val engagementScore =
             LIKE_WEIGHT * ln1p(feed.likeCount.toDouble()) + COMMENT_WEIGHT * ln1p(commentCount.toDouble())
@@ -315,7 +294,7 @@ import org.springframework.web.multipart.MultipartFile
 
         val freshnessPenalty =
             feed.createdAt?.let { createdAt ->
-                val hoursSinceCreated = Duration.between(createdAt, LocalDateTime.now()).toHours()
+                val hoursSinceCreated = Duration.between(createdAt, now).toHours()
                 TIME_DECAY_PER_HOUR * maxOf(hoursSinceCreated, 0L).toDouble()
             } ?: 0.0
 

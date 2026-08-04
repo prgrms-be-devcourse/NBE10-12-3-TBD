@@ -48,6 +48,28 @@ interface RecommendFoodie {
 
 const RECOMMEND_PAGE_SIZE = 20;
 
+function pickUniqueFoodies(feeds: Feed[], currentUserId: number): RecommendFoodie[] {
+  const seen = new Set<number>();
+  const unique: RecommendFoodie[] = [];
+
+  for (const feed of feeds) {
+    if (feed.userId === currentUserId) continue;
+
+    if (!seen.has(feed.userId)) {
+      seen.add(feed.userId);
+      unique.push({
+        userId: feed.userId,
+        nickname: feed.nickname,
+        profileImage: feed.profileImage,
+      });
+    }
+
+    if (unique.length >= 3) break;
+  }
+
+  return unique;
+}
+
 function FeedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -97,12 +119,23 @@ function FeedContent() {
     setActiveCommentFeedId(null);
   };
 
+  // 추천 탭은 스크롤 시 posts를 recommendPool에서 다시 잘라오므로, 좋아요/댓글/삭제 같은
+  // 변경은 posts뿐 아니라 recommendPool에도 반영해야 스크롤 후에도 유지된다.
+  const updatePostEverywhere = (feedId: number, updater: (post: Feed) => Feed) => {
+    const apply = (prev: Feed[]) =>
+      prev.map((post) => (post.feedId === feedId ? updater(post) : post));
+    setPosts(apply);
+    setRecommendPool(apply);
+  };
+
+  const removePostEverywhere = (feedId: number) => {
+    const apply = (prev: Feed[]) => prev.filter((post) => post.feedId !== feedId);
+    setPosts(apply);
+    setRecommendPool(apply);
+  };
+
   const handleCommentCountChange = (feedId: number, count: number) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.feedId === feedId ? { ...post, commentCount: count } : post,
-      ),
-    );
+    updatePostEverywhere(feedId, (post) => ({ ...post, commentCount: count }));
   };
 
   useEffect(() => {
@@ -201,11 +234,15 @@ function FeedContent() {
       return;
     }
 
-    setLoadingMore(true);
-    const end = (page + 1) * RECOMMEND_PAGE_SIZE;
-    setPosts(recommendPool.slice(0, end));
-    setHasMore(end < recommendPool.length);
-    setLoadingMore(false);
+    const applyNextSlice = () => {
+      setLoadingMore(true);
+      const end = (page + 1) * RECOMMEND_PAGE_SIZE;
+      setPosts(recommendPool.slice(0, end));
+      setHasMore(end < recommendPool.length);
+      setLoadingMore(false);
+    };
+
+    applyNextSlice();
   }, [activeTab, page, recommendPool]);
 
   const handleRefreshRecommend = () => {
@@ -218,36 +255,29 @@ function FeedContent() {
     setPage(0);
   };
 
+  // 추천 탭에서는 이미 recommendPool을 통해 같은 데이터를 받아뒀으므로, 추천 푸디만
+  // 뽑으려고 /recommend를 또 호출하지 않고 recommendPool을 재사용한다.
   useEffect(() => {
     if (!currentUserId) return;
+
+    const applyFoodiesFromPool = (pool: Feed[]) => {
+      setRecommendFoodies(pickUniqueFoodies(pool, currentUserId));
+    };
+
+    if (activeTab === "recommended") {
+      if (recommendPool.length === 0) return;
+      applyFoodiesFromPool(recommendPool);
+      return;
+    }
 
     const loadFoodies = async () => {
       const res = await apiFetchJson<Feed[]>("/api/v1/feeds/recommend");
       if (!res.ok || !res.data) return;
-
-      const seen = new Set<number>();
-      const unique: RecommendFoodie[] = [];
-
-      for (const feed of res.data) {
-        if (feed.userId === currentUserId) continue;
-
-        if (!seen.has(feed.userId)) {
-          seen.add(feed.userId);
-          unique.push({
-            userId: feed.userId,
-            nickname: feed.nickname,
-            profileImage: feed.profileImage,
-          });
-        }
-
-        if (unique.length >= 3) break;
-      }
-
-      setRecommendFoodies(unique);
+      applyFoodiesFromPool(res.data);
     };
 
     loadFoodies();
-  }, [currentUserId]);
+  }, [currentUserId, activeTab, recommendPool]);
 
   const handleFollow = async (userId: number) => {
     const res = await apiFetchJson(`/api/v1/follows/${userId}`, {
@@ -267,19 +297,11 @@ function FeedContent() {
       method: currentlyLiked ? "DELETE" : "POST",
     });
     if (res.ok) {
-      setPosts((prev) =>
-        prev.map((post) =>
-          post.feedId === feedId
-            ? {
-                ...post,
-                isLikedByMe: !currentlyLiked,
-                likeCount: currentlyLiked
-                  ? post.likeCount - 1
-                  : post.likeCount + 1,
-              }
-            : post,
-        ),
-      );
+      updatePostEverywhere(feedId, (post) => ({
+        ...post,
+        isLikedByMe: !currentlyLiked,
+        likeCount: currentlyLiked ? post.likeCount - 1 : post.likeCount + 1,
+      }));
     } else {
       alert(res.message || "좋아요 처리에 실패했습니다.");
     }
@@ -311,7 +333,7 @@ function FeedContent() {
     });
 
     if (res.ok) {
-      setPosts((prev) => prev.filter((post) => post.feedId !== feedId));
+      removePostEverywhere(feedId);
       setOpenMenuFeedId(null);
       window.dispatchEvent(new Event("follow-state-change"));
       window.dispatchEvent(new Event("feed-state-change"));

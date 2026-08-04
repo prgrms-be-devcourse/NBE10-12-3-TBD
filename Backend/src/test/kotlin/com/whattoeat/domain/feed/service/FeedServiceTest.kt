@@ -9,7 +9,6 @@ import com.whattoeat.domain.feed.entity.Feed
 import com.whattoeat.domain.feed.event.FeedCreatedEvent
 import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.feedlike.repository.FeedLikeRepository
-import com.whattoeat.domain.follow.entity.Follow
 import com.whattoeat.domain.follow.repository.FollowRepository
 import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.domain.restaurant.repository.RestaurantRepository
@@ -37,7 +36,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Pageable
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -314,24 +312,17 @@ class FeedServiceTest {
     }
 
     @Test
-    @DisplayName("팔로잉한 사용자의 피드와 내 피드를 함께 조회한다")
+    @DisplayName("팔로잉 탭 조회 결과를 응답으로 변환한다 (팔로우 여부 판정은 리포지토리 쿼리 책임)")
     fun getFollowingFeeds() {
         val user1 = createTestUser(1L, "user1")
         val user2 = createTestUser(2L, "user2")
-        val user3 = createTestUser(3L, "user3")
-
-        val follow = Follow.of(user1, user2)
 
         val myFeed = createTestFeed(5L, user1, "my feed")
         val user2Feed = createTestFeed(10L, user2, "user2 feed")
-        val user3Feed = createTestFeed(20L, user3, "user3 feed")
 
         val pageable = PageRequest.of(0, 10)
 
-        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
-            .willReturn(PageImpl(listOf(follow)))
-
-        given(feedRepository.findByUser_IdInOrderByIdDesc(setOf(2L, 1L), pageable))
+        given(feedRepository.findFollowingFeeds(1L, pageable))
             .willReturn(PageImpl(listOf(user2Feed, myFeed), pageable, 2))
 
         given(commentRepository.countByFeedIds(listOf(10L, 5L))).willReturn(emptyList())
@@ -340,56 +331,21 @@ class FeedServiceTest {
 
         val result: Page<FeedListResponse> = feedService.getFollowingFeeds(user1.id!!, pageable)
 
-        assertThat(result.content).hasSize(2)
         assertThat(result.content)
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
-            .contains(user2Feed.id, myFeed.id)
-            .doesNotContain(user3Feed.id)
-
-        assertThat(result.content)
-            .extracting(Function<FeedListResponse, String> { response -> response.content })
-            .contains("user2 feed", "my feed")
-            .doesNotContain("user3 feed")
+            .containsExactly(user2Feed.id, myFeed.id)
     }
 
     @Test
-    @DisplayName("팔로우한 사람이 없어도 내 피드는 팔로잉 탭에 노출된다")
-    fun getFollowingFeeds_showsOwnFeedWithNoFollowing() {
-        val user1 = createTestUser(1L, "user1")
-        val myFeed = createTestFeed(5L, user1, "my feed")
-
-        val pageable = PageRequest.of(0, 10)
-
-        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
-            .willReturn(PageImpl(emptyList()))
-
-        given(feedRepository.findByUser_IdInOrderByIdDesc(setOf(1L), pageable))
-            .willReturn(PageImpl(listOf(myFeed), pageable, 1))
-
-        given(commentRepository.countByFeedIds(listOf(5L))).willReturn(emptyList())
-        given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
-            .willReturn(emptyList())
-
-        val result: Page<FeedListResponse> = feedService.getFollowingFeeds(user1.id!!, pageable)
-
-        assertThat(result.content)
-            .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
-            .containsExactly(myFeed.id)
-    }
-
-    @Test
-    @DisplayName("본인 피드는 추천 후보에서 제외된다")
-    fun getRecommendedFeeds_excludesOwnFeed() {
+    @DisplayName("추천 후보 조회 결과를 응답으로 변환한다 (제외 판정은 리포지토리 쿼리 책임)")
+    fun getRecommendedFeeds_mapsCandidatesToResponse() {
         val user1 = createTestUser(1L, "user1")
         val user2 = createTestUser(2L, "user2")
 
         val user2Feed = createTestFeed(20L, user2, "user2 feed")
 
-        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
-            .willReturn(PageImpl(emptyList()))
-
-        given(feedRepository.findByUser_IdNotInOrderByIdDesc(setOf(1L), PageRequest.of(0, 300)))
-            .willReturn(PageImpl(listOf(user2Feed)))
+        given(feedRepository.findRecommendCandidates(1L, null, PageRequest.of(0, 300)))
+            .willReturn(listOf(user2Feed))
 
         given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
@@ -403,62 +359,26 @@ class FeedServiceTest {
     }
 
     @Test
-    @DisplayName("팔로우한 사용자의 피드는 추천 후보에서 제외된다 (팔로우 탭에서 이미 노출되므로)")
-    fun getRecommendedFeeds_excludesFollowingFeeds() {
-        val me = createTestUser(1L, "me")
-        val followedAuthor = createTestUser(2L, "followedAuthor")
-        val stranger = createTestUser(3L, "stranger")
-
-        val follow = Follow.of(me, followedAuthor)
-
-        val strangerFeed = createTestFeed(20L, stranger, "stranger feed")
-
-        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
-            .willReturn(PageImpl(listOf(follow)))
-
-        given(feedRepository.findByUser_IdNotInOrderByIdDesc(setOf(2L, 1L), PageRequest.of(0, 300)))
-            .willReturn(PageImpl(listOf(strangerFeed)))
-
-        given(followRepository.findFollowingIdsByFollowerIds(anyList(), anyCollection())).willReturn(emptyList())
-        given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
-        given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
-            .willReturn(emptyList())
-        given(feedLikeRepository.findFeedIdsLikedByUserIds(anyList(), anyList())).willReturn(emptyList())
-
-        val result: List<FeedListResponse> = feedService.getRecommendedFeeds(me.id)
-
-        assertThat(result)
-            .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
-            .containsExactly(strangerFeed.id)
-    }
-
-    @Test
     @DisplayName("2차 팔로우 작성자의 피드, 팔로우한 사용자가 좋아요한 피드가 점수 가산으로 상위 노출된다")
     fun getRecommendedFeeds_boostsSecondDegreeFollowingSignals() {
         val me = createTestUser(1L, "me")
-        val followedAuthor = createTestUser(2L, "followedAuthor")
         val secondDegreeAuthor = createTestUser(5L, "secondDegreeAuthor")
         val strangerLiked = createTestUser(3L, "strangerLiked")
         val strangerPlain = createTestUser(4L, "strangerPlain")
-
-        val follow = Follow.of(me, followedAuthor)
 
         // 좋아요/댓글 수는 동일하게 두고, 팔로우 신호만 다르게 하여 정렬 효과를 검증한다
         val secondDegreeFeed = createTestFeed(10L, secondDegreeAuthor, "second degree author feed")
         val likedByFollowingFeed = createTestFeed(20L, strangerLiked, "liked by following feed")
         val plainFeed = createTestFeed(30L, strangerPlain, "plain feed")
 
-        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
-            .willReturn(PageImpl(listOf(follow)))
+        given(feedRepository.findRecommendCandidates(1L, null, PageRequest.of(0, 300)))
+            .willReturn(listOf(plainFeed, likedByFollowingFeed, secondDegreeFeed))
 
-        given(feedRepository.findByUser_IdNotInOrderByIdDesc(setOf(2L, 1L), PageRequest.of(0, 300)))
-            .willReturn(PageImpl(listOf(plainFeed, likedByFollowingFeed, secondDegreeFeed)))
-
-        given(followRepository.findFollowingIdsByFollowerIds(anyList(), anyCollection())).willReturn(listOf(5L))
+        given(followRepository.findSecondDegreeAuthorIds(anyLong(), anyCollection())).willReturn(listOf(5L))
         given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(emptyList())
-        given(feedLikeRepository.findFeedIdsLikedByUserIds(anyList(), anyList()))
+        given(feedLikeRepository.findFeedIdsLikedByFollowingOf(anyLong(), anyList()))
             .willReturn(listOf(20L))
 
         val result: List<FeedListResponse> = feedService.getRecommendedFeeds(me.id)
@@ -468,9 +388,9 @@ class FeedServiceTest {
             .containsExactly(10L, 20L, 30L)
 
         // 팔로잉이 좋아요한 글 조회가 현재 후보(300개) 범위로 제한되는지 검증한다.
-        verify(feedLikeRepository).findFeedIdsLikedByUserIds(listOf(2L), listOf(30L, 20L, 10L))
+        verify(feedLikeRepository).findFeedIdsLikedByFollowingOf(1L, listOf(30L, 20L, 10L))
         // 2차 팔로우 작성자 조회도 팔로우 그래프 전체가 아니라 현재 후보 작성자로 제한되는지 검증한다.
-        verify(followRepository).findFollowingIdsByFollowerIds(listOf(2L), setOf(4L, 3L, 5L))
+        verify(followRepository).findSecondDegreeAuthorIds(1L, setOf(4L, 3L, 5L))
     }
 
     @Test
@@ -481,11 +401,8 @@ class FeedServiceTest {
 
         val olderFeed = createTestFeed(5L, stranger, "older feed")
 
-        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
-            .willReturn(PageImpl(emptyList()))
-
-        given(feedRepository.findByUser_IdNotInAndIdLessThanOrderByIdDesc(setOf(1L), 100L, PageRequest.of(0, 300)))
-            .willReturn(PageImpl(listOf(olderFeed)))
+        given(feedRepository.findRecommendCandidates(1L, 100L, PageRequest.of(0, 300)))
+            .willReturn(listOf(olderFeed))
 
         given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
@@ -514,11 +431,8 @@ class FeedServiceTest {
         val surgingFeed = createTestFeed(80L, surgingAuthor, "surging feed")
         val candidates = feeds + surgingFeed
 
-        given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
-            .willReturn(PageImpl(emptyList()))
-
-        given(feedRepository.findByUser_IdNotInOrderByIdDesc(setOf(1L), PageRequest.of(0, 300)))
-            .willReturn(PageImpl(candidates))
+        given(feedRepository.findRecommendCandidates(1L, null, PageRequest.of(0, 300)))
+            .willReturn(candidates)
 
         given(commentRepository.countByFeedIds(anyList())).willReturn(emptyList())
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
