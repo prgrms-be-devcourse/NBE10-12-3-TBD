@@ -20,7 +20,6 @@ import java.time.Duration
 import java.time.LocalDateTime
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Page
-import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.security.access.AccessDeniedException
@@ -163,8 +162,8 @@ import org.springframework.web.multipart.MultipartFile
     }
 
     @Transactional(readOnly = true)
-     fun getRecommendedFeeds(userId: Long?, pageable: Pageable, beforeFeedId: Long? = null): Page<FeedListResponse> {
-        if (userId == null) return Page.empty(pageable)
+     fun getRecommendedFeeds(userId: Long?, beforeFeedId: Long? = null): List<FeedListResponse> {
+        if (userId == null) return emptyList()
 
         val followingUserIds =
             followRepository
@@ -188,7 +187,7 @@ import org.springframework.web.multipart.MultipartFile
             }
 
         if (candidates.isEmpty()) {
-            return Page.empty(pageable)
+            return emptyList()
         }
 
         val commentCounts = countCommentByFeedIds(candidates)
@@ -221,22 +220,16 @@ import org.springframework.web.multipart.MultipartFile
         val spotlightFeeds = pickSpotlightFeeds(candidates)
         val finalOrder = interleaveSpotlightFeeds(ranked, spotlightFeeds)
 
-        val start = pageable.offset.toInt()
-        if (start >= finalOrder.size) {
-            return PageImpl(emptyList(), pageable, finalOrder.size.toLong())
+        // 정렬 기준(점수)이 실시간 데이터에 따라 요청마다 흔들릴 수 있으므로, 한 배치의 순위는
+        // 이 응답 한 번에 전부 확정해서 내려준다. 서버에 offset을 넘겨 여러 번 나눠 받으면
+        // 그 사이 점수가 바뀌어 일부 피드가 노출되지 않고 누락될 수 있다.
+        return finalOrder.map { feed ->
+            FeedListResponse.from(
+                feed,
+                commentCounts.getOrDefault(feed.id, 0L),
+                likedFeedIds.contains(feed.id),
+            )
         }
-        val end = minOf(start + pageable.pageSize, finalOrder.size)
-
-        val content =
-            finalOrder.subList(start, end).map { feed ->
-                FeedListResponse.from(
-                    feed,
-                    commentCounts.getOrDefault(feed.id, 0L),
-                    likedFeedIds.contains(feed.id),
-                )
-            }
-
-        return PageImpl(content, pageable, finalOrder.size.toLong())
     }
 
     // 최근 SURGE_WINDOW_HOURS 안에 좋아요/댓글이 급증했거나, 작성자가 팔로워가 많은(혹은

@@ -205,11 +205,11 @@ function WritePostContent() {
 
   useEffect(() => {
     const loadRecent = async () => {
-      const res = await apiFetchJson<{
-        feeds: { feedId: number; nickname: string; content: string }[];
-      }>("/api/v1/feeds/recommend");
+      const res = await apiFetchJson<
+        { feedId: number; nickname: string; content: string }[]
+      >("/api/v1/feeds/recommend");
       if (res.ok && res.data) {
-        setRecentPosts(res.data.feeds.slice(0, 3));
+        setRecentPosts(res.data.slice(0, 3));
       }
     };
 

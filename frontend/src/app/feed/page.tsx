@@ -46,6 +46,8 @@ interface RecommendFoodie {
   profileImage: string | null;
 }
 
+const RECOMMEND_PAGE_SIZE = 20;
+
 function FeedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -60,6 +62,7 @@ function FeedContent() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [recommendCursor, setRecommendCursor] = useState<number | null>(null);
+  const [recommendPool, setRecommendPool] = useState<Feed[]>([]);
   const [recommendFoodies, setRecommendFoodies] = useState<RecommendFoodie[]>(
     [],
   );
@@ -124,7 +127,10 @@ function FeedContent() {
     });
   }, []);
 
+  // 팔로잉 탭: 서버가 id 역순으로 페이지네이션한 결과를 그대로 이어붙인다.
   useEffect(() => {
+    if (activeTab !== "following") return;
+
     const load = async () => {
       if (page === 0) {
         setLoading(true);
@@ -133,16 +139,8 @@ function FeedContent() {
       }
       setError("");
 
-      const endpoint =
-        activeTab === "following"
-          ? "/api/v1/feeds/following"
-          : "/api/v1/feeds/recommend";
-      const cursorParam =
-        activeTab === "recommended" && recommendCursor !== null
-          ? `&beforeFeedId=${recommendCursor}`
-          : "";
       const res = await apiFetchJson<FeedListPageResponse>(
-        `${endpoint}?page=${page}&size=20${cursorParam}`,
+        `/api/v1/feeds/following?page=${page}&size=${RECOMMEND_PAGE_SIZE}`,
       );
 
       if (res.ok && res.data) {
@@ -162,12 +160,59 @@ function FeedContent() {
     };
 
     load();
-  }, [activeTab, page, recommendCursor]);
+  }, [activeTab, page]);
+
+  // 추천 탭: 점수순으로 이미 확정된 전체 후보 묶음(최대 300개)을 한 번에 받아와서
+  // 스크롤에 따라 로컬에서 잘라 보여준다. 페이지별로 서버를 다시 호출하면 그 사이
+  // 점수(좋아요/댓글 등)가 바뀌어 일부 피드가 노출 없이 누락될 수 있기 때문이다.
+  useEffect(() => {
+    if (activeTab !== "recommended") return;
+
+    const loadPool = async () => {
+      setLoading(true);
+      setError("");
+
+      const cursorParam =
+        recommendCursor !== null ? `?beforeFeedId=${recommendCursor}` : "";
+      const res = await apiFetchJson<Feed[]>(
+        `/api/v1/feeds/recommend${cursorParam}`,
+      );
+
+      if (res.ok && res.data) {
+        setRecommendPool(res.data);
+        setPosts(res.data.slice(0, RECOMMEND_PAGE_SIZE));
+        setHasMore(res.data.length > RECOMMEND_PAGE_SIZE);
+      } else {
+        setError(res.message || "피드를 불러오지 못했습니다.");
+        setRecommendPool([]);
+        setPosts([]);
+        setHasMore(false);
+      }
+
+      setLoading(false);
+    };
+
+    loadPool();
+  }, [activeTab, recommendCursor]);
+
+  // 추천 탭에서 스크롤로 다음 페이지를 요청하면 이미 받아온 후보 묶음에서 잘라서 보여준다.
+  useEffect(() => {
+    if (activeTab !== "recommended" || page === 0 || recommendPool.length === 0) {
+      return;
+    }
+
+    setLoadingMore(true);
+    const end = (page + 1) * RECOMMEND_PAGE_SIZE;
+    setPosts(recommendPool.slice(0, end));
+    setHasMore(end < recommendPool.length);
+    setLoadingMore(false);
+  }, [activeTab, page, recommendPool]);
 
   const handleRefreshRecommend = () => {
-    if (posts.length === 0) return;
-    const oldestFeedId = Math.min(...posts.map((post) => post.feedId));
+    if (recommendPool.length === 0) return;
+    const oldestFeedId = Math.min(...recommendPool.map((post) => post.feedId));
     setRecommendCursor(oldestFeedId);
+    setRecommendPool([]);
     setPosts([]);
     setHasMore(true);
     setPage(0);
@@ -177,15 +222,13 @@ function FeedContent() {
     if (!currentUserId) return;
 
     const loadFoodies = async () => {
-      const res = await apiFetchJson<FeedListPageResponse>(
-        "/api/v1/feeds/recommend",
-      );
-      if (!res.ok || !res.data?.feeds) return;
+      const res = await apiFetchJson<Feed[]>("/api/v1/feeds/recommend");
+      if (!res.ok || !res.data) return;
 
       const seen = new Set<number>();
       const unique: RecommendFoodie[] = [];
 
-      for (const feed of res.data.feeds) {
+      for (const feed of res.data) {
         if (feed.userId === currentUserId) continue;
 
         if (!seen.has(feed.userId)) {
@@ -281,6 +324,7 @@ function FeedContent() {
     setPage(0);
     setPosts([]);
     setRecommendCursor(null);
+    setRecommendPool([]);
     router.replace(`/feed?tab=${tab}`, { scroll: false });
   };
 

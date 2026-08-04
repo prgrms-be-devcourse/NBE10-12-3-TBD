@@ -358,8 +358,6 @@ class FeedServiceTest {
 
         val user2Feed = createTestFeed(20L, user2, "user2 feed")
 
-        val pageable = PageRequest.of(0, 10)
-
         given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
             .willReturn(PageImpl(emptyList()))
 
@@ -370,9 +368,9 @@ class FeedServiceTest {
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(emptyList())
 
-        val result: Page<FeedListResponse> = feedService.getRecommendedFeeds(user1.id, pageable)
+        val result: List<FeedListResponse> = feedService.getRecommendedFeeds(user1.id)
 
-        assertThat(result.content)
+        assertThat(result)
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
             .containsExactly(user2Feed.id)
     }
@@ -388,8 +386,6 @@ class FeedServiceTest {
 
         val strangerFeed = createTestFeed(20L, stranger, "stranger feed")
 
-        val pageable = PageRequest.of(0, 10)
-
         given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
             .willReturn(PageImpl(listOf(follow)))
 
@@ -402,9 +398,9 @@ class FeedServiceTest {
             .willReturn(emptyList())
         given(feedLikeRepository.findFeedIdsLikedByUserIds(listOf(2L))).willReturn(emptyList())
 
-        val result: Page<FeedListResponse> = feedService.getRecommendedFeeds(me.id, pageable)
+        val result: List<FeedListResponse> = feedService.getRecommendedFeeds(me.id)
 
-        assertThat(result.content)
+        assertThat(result)
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
             .containsExactly(strangerFeed.id)
     }
@@ -425,8 +421,6 @@ class FeedServiceTest {
         val likedByFollowingFeed = createTestFeed(20L, strangerLiked, "liked by following feed")
         val plainFeed = createTestFeed(30L, strangerPlain, "plain feed")
 
-        val pageable = PageRequest.of(0, 10)
-
         given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
             .willReturn(PageImpl(listOf(follow)))
 
@@ -440,9 +434,9 @@ class FeedServiceTest {
         given(feedLikeRepository.findFeedIdsLikedByUserIds(listOf(2L)))
             .willReturn(listOf(20L))
 
-        val result: Page<FeedListResponse> = feedService.getRecommendedFeeds(me.id, pageable)
+        val result: List<FeedListResponse> = feedService.getRecommendedFeeds(me.id)
 
-        assertThat(result.content)
+        assertThat(result)
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
             .containsExactly(10L, 20L, 30L)
     }
@@ -455,8 +449,6 @@ class FeedServiceTest {
 
         val olderFeed = createTestFeed(5L, stranger, "older feed")
 
-        val pageable = PageRequest.of(0, 10)
-
         given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
             .willReturn(PageImpl(emptyList()))
 
@@ -467,9 +459,9 @@ class FeedServiceTest {
         given(feedLikeRepository.findLikedFeedIdsByUserIdAndFeedIds(anyLong(), anyList()))
             .willReturn(emptyList())
 
-        val result: Page<FeedListResponse> = feedService.getRecommendedFeeds(me.id, pageable, beforeFeedId = 100L)
+        val result: List<FeedListResponse> = feedService.getRecommendedFeeds(me.id, beforeFeedId = 100L)
 
-        assertThat(result.content)
+        assertThat(result)
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
             .containsExactly(olderFeed.id)
     }
@@ -490,8 +482,6 @@ class FeedServiceTest {
         val surgingFeed = createTestFeed(80L, surgingAuthor, "surging feed")
         val candidates = feeds + surgingFeed
 
-        val pageable = PageRequest.of(0, 20)
-
         given(followRepository.findByFollower_Id(1L, Pageable.unpaged()))
             .willReturn(PageImpl(emptyList()))
 
@@ -511,9 +501,9 @@ class FeedServiceTest {
         given(followRepository.countRecentFollowersByUserIds(anyList(), anyValue()))
             .willReturn(emptyList())
 
-        val result: Page<FeedListResponse> = feedService.getRecommendedFeeds(me.id, pageable)
+        val result: List<FeedListResponse> = feedService.getRecommendedFeeds(me.id)
 
-        assertThat(result.content)
+        assertThat(result)
             .extracting(Function<FeedListResponse, Long?> { response -> response.feedId })
             .containsExactly(10L, 20L, 30L, 40L, 50L, 80L, 60L, 70L)
     }

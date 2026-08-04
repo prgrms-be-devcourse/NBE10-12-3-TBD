@@ -4,6 +4,7 @@ import com.whattoeat.domain.feed.dto.request.FeedCreateRequest
 import com.whattoeat.domain.feed.dto.request.FeedUpdateRequest
 import com.whattoeat.domain.feed.dto.response.FeedDetailResponse
 import com.whattoeat.domain.feed.dto.response.FeedListPageResponse
+import com.whattoeat.domain.feed.dto.response.FeedListResponse
 import com.whattoeat.domain.feed.service.FeedService
 import com.whattoeat.global.rsData.RsData
 import com.whattoeat.global.security.CustomUserDetails
@@ -64,10 +65,9 @@ class FeedController(
     fun getRecommendedFeeds(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
         @RequestParam(required = false) beforeFeedId: Long?,
-        pageable: Pageable,
-    ): RsData<FeedListPageResponse> {
-        val page = feedService.getRecommendedFeeds(userDetails.userId, pageable, beforeFeedId)
-        return RsData.success(FeedListPageResponse.from(page), "추천 피드 조회가 완료되었습니다.")
+    ): RsData<List<FeedListResponse>> {
+        val feeds = feedService.getRecommendedFeeds(userDetails.userId, beforeFeedId)
+        return RsData.success(feeds, "추천 피드 조회가 완료되었습니다.")
     }
 
     @PutMapping(value = ["/{id}"], consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
