@@ -294,7 +294,7 @@ function SearchForm({
   return (
     <form onSubmit={onSubmit}>
       {/* 검색 입력 */}
-      <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface-soft px-3 py-2.5">
+      <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface-soft px-3 py-1.5">
         <Search className="h-5 w-5 shrink-0 text-muted" />
 
         {mounted && (
@@ -311,7 +311,7 @@ function SearchForm({
             type="button"
             onClick={onClear}
             aria-label="검색어 지우기"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-ink"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-ink"
           >
             <X className="h-4 w-4" />
           </button>
@@ -322,7 +322,7 @@ function SearchForm({
           onClick={onCurrentLocation}
           disabled={loading}
           aria-label="현재 위치"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-hairline bg-white text-primary transition-colors hover:bg-surface-strong disabled:opacity-60"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-hairline bg-white text-primary transition-colors hover:bg-surface-strong disabled:opacity-60"
         >
           <Navigation className="h-4 w-4" />
         </button>
@@ -330,20 +330,20 @@ function SearchForm({
         <button
           type="submit"
           disabled={loading}
-          className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary-active disabled:opacity-70"
+          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-primary-active disabled:opacity-70"
         >
           {loading ? "검색 중" : "검색"}
         </button>
       </div>
 
       {/* 카테고리 */}
-      <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+      <div className="mt-2 flex gap-1.5 overflow-x-auto">
         {categories.map((category) => (
           <button
             key={category}
             type="button"
             onClick={() => onCategoryChange(category)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
               category === activeCategory
                 ? "bg-primary text-white"
                 : "bg-surface-soft text-muted hover:bg-hairline-soft"
@@ -2470,8 +2470,8 @@ function SearchPage() {
         )}
 
         {/* 모바일: 지도 위에 뜨는 검색창 + 카테고리 (lg 미만) */}
-        <div className="absolute inset-x-3 top-3 z-20 space-y-2 lg:hidden">
-          <div className="rounded-2xl border border-hairline-soft bg-surface/95 p-3 shadow-lg backdrop-blur">
+        <div className="absolute inset-x-3 top-3 z-20 lg:hidden">
+          <div className="rounded-2xl border border-hairline-soft bg-surface/95 p-2 shadow-lg backdrop-blur">
             <SearchForm
               mounted={mounted}
               query={query}
