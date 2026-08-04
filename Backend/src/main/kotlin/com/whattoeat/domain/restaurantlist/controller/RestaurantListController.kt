@@ -231,6 +231,34 @@ class RestaurantListController (
         )
     }
 
+    @GetMapping("/users/{userId}")
+    @Operation(summary = "특정 사용자의 맛집 리스트 다건 조회")
+    fun getRestaurantListsByUserId(
+        @PathVariable userId: Long,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "10") size: Int
+    ): RsData<RestaurantListResponse.RestaurantListsResponse> {
+        val pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
+        val result = restaurantListService.findPublicByUserId(userId, pageable)
+        val lists = result.content.map { RestaurantListResponse.RestaurantLists(it) }
+
+        return RsData.success(
+            RestaurantListResponse.RestaurantListsResponse(
+                lists,
+                result.totalPages,
+                result.totalElements
+            ),
+            "사용자의 맛집 리스트 목록 조회가 완료되었습니다."
+        )
+    }
+
     @GetMapping("/others")
     @Operation(summary = "다른 사용자의 맛집 리스트 다건 조회")
     fun getOtherRestaurantLists(

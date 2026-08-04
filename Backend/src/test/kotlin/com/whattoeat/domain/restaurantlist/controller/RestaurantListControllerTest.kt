@@ -468,6 +468,61 @@ class RestaurantListControllerTest {
     }
 
     @Test
+    fun `특정 사용자의 공개 맛집리스트를 페이지로 조회한다`() {
+        val targetUser = mockUser(
+            id = 2L,
+            nickname = "user2"
+        )
+        val restaurantList = createRestaurantList(
+            id = 3L,
+            user = targetUser,
+            title = "user2 맛집",
+            description = "공개 리스트",
+            moodTag = MoodTag.FRIENDS
+        )
+        val pageable = PageRequest.of(
+            1,
+            5,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
+
+        given(
+            restaurantListService.findPublicByUserId(
+                2L,
+                pageable
+            )
+        ).willReturn(
+            PageImpl(
+                listOf(restaurantList),
+                pageable,
+                6L
+            )
+        )
+
+        SecurityContextHolder.clearContext()
+
+        mockMvc.perform(
+            get("/api/v1/lists/users/2")
+                .param("page", "1")
+                .param("size", "5")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.lists.length()").value(1))
+            .andExpect(jsonPath("$.data.lists[0].id").value(3L))
+            .andExpect(jsonPath("$.data.lists[0].userId").value(2L))
+            .andExpect(jsonPath("$.data.totalPages").value(2))
+            .andExpect(jsonPath("$.data.totalElements").value(6L))
+
+        then(restaurantListService)
+            .should()
+            .findPublicByUserId(2L, pageable)
+    }
+
+    @Test
     fun `전체 맛집리스트 단건조회 성공`() {
         val user = mockUser(
             id = 1L,

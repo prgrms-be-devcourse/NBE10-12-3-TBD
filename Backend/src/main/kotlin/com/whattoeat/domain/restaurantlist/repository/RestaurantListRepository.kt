@@ -13,6 +13,8 @@ interface RestaurantListRepository : JpaRepository<RestaurantList, Long> {
     // 내 리스트 조회 : 최신 생성 리스트가 위로 오게 id 내림차순
     fun findByUserIdOrderByIdDesc(userId: Long, pageable: Pageable): Page<RestaurantList>
 
+    fun findByUserId(userId: Long, pageable: Pageable): Page<RestaurantList>
+
     fun findByIdAndUserId(id: Long, userId: Long): Optional<RestaurantList>
 
     @Query("""

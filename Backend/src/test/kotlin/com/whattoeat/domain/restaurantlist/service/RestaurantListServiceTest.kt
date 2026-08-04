@@ -32,6 +32,7 @@ import org.mockito.Mockito.verify
 import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.test.util.ReflectionTestUtils
 import java.time.LocalDateTime
 import java.util.Optional
@@ -216,6 +217,45 @@ class RestaurantListServiceTest {
         assertThat(result.totalPages).isEqualTo(1)
         assertThat(result.number).isEqualTo(0)
         assertThat(result.size).isEqualTo(10)
+    }
+
+    @Test
+    fun `특정 사용자의 공개 맛집리스트를 페이지로 조회한다`() {
+        val targetUser = mock(User::class.java)
+        val restaurantList = createRestaurantList(3L, targetUser)
+        val pageable = PageRequest.of(
+            1,
+            5,
+            Sort.by(
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
+            )
+        )
+        val page = PageImpl(
+            listOf(restaurantList),
+            pageable,
+            6L
+        )
+
+        given(
+            restaurantListRepository.findByUserId(
+                2L,
+                pageable
+            )
+        ).willReturn(page)
+
+        val result = restaurantListService.findPublicByUserId(
+            2L,
+            pageable
+        )
+
+        assertThat(result.content).containsExactly(restaurantList)
+        assertThat(result.totalElements).isEqualTo(6L)
+        assertThat(result.totalPages).isEqualTo(2)
+
+        then(restaurantListRepository)
+            .should()
+            .findByUserId(2L, pageable)
     }
 
     @Test

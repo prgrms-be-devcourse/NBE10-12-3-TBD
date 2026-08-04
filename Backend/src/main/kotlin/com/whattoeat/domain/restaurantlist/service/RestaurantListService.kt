@@ -134,6 +134,11 @@ class RestaurantListService(
         return restaurantListRepository.findAll(pageable)
     }
 
+    @Transactional(readOnly = true)
+    fun findPublicByUserId(userId: Long, pageable: Pageable): Page<RestaurantList> {
+        return restaurantListRepository.findByUserId(userId, pageable)
+    }
+
     // 전체 식당 리스트 단건 조회
     @Transactional(readOnly = true)
     fun findById(id: Long): RestaurantList {
