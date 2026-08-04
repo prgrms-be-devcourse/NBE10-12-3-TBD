@@ -18,6 +18,7 @@ import {
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 
 import { apiFetchJson } from "@/lib/api";
+import { KAKAO_JS_KEY } from "@/lib/kakao";
 import { MOOD_TAGS } from "@/lib/mood";
 import { buildListHref } from "@/lib/listNavigation";
 
@@ -211,7 +212,7 @@ export default function ListEditPage() {
 
   const listId = Number(params.id);
 
-  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY;
+  const kakaoKey = KAKAO_JS_KEY;
 
   /* =======================================================
    * 리스트 기본 정보

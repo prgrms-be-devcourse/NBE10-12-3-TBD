@@ -7,6 +7,7 @@ import { ArrowLeft, X, ImagePlus, Send, Lightbulb, Search } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { apiFetch, apiFetchJson, getImageUrl } from "@/lib/api";
 import { resizeImageToInstagram } from "@/lib/image";
+import { KAKAO_JS_KEY } from "@/lib/kakao";
 import { MOOD_TAGS, type MoodTagValue } from "@/lib/mood";
 
 interface KakaoRestaurant {
@@ -57,9 +58,7 @@ function WritePostContent() {
   const editFeedId = searchParams.get("edit");
   const isEditMode = Boolean(editFeedId);
 
-  const kakaoKey =
-    process.env.NEXT_PUBLIC_KAKAO_JS_KEY ||
-    process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY;
+  const kakaoKey = KAKAO_JS_KEY;
 
   const [content, setContent] = useState("");
   const [selectedMood, setSelectedMood] = useState<MoodTagValue | null>(null);
