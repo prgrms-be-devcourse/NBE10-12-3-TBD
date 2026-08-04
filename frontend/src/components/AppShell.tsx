@@ -454,9 +454,9 @@ export default function AppShell({
 
   const contentGridClass = fullWidth
     ? rightSidebar
-      ? "md:grid-cols-[300px_minmax(0,1fr)_300px]"
-      : "md:grid-cols-[300px_minmax(0,1fr)]"
-    : "md:grid-cols-[300px_minmax(0,1fr)_300px]";
+      ? "xl:grid-cols-[300px_minmax(0,1fr)_300px]"
+      : "xl:grid-cols-[300px_minmax(0,1fr)]"
+    : "xl:grid-cols-[300px_minmax(0,1fr)_300px]";
 
   /* =========================================================
    * 화면
@@ -469,7 +469,7 @@ export default function AppShell({
        * ===================================================== */}
 
       <header className="sticky top-0 z-30 border-b border-hairline-soft bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex h-[100px] max-w-[calc(100vw-200px)] items-center px-4 lg:px-0">
+        <div className="mx-auto flex h-16 w-full items-center px-4 md:h-[100px] lg:px-8 xl:max-w-[calc(100vw-200px)] xl:px-0">
           {/* 왼쪽 */}
 
           <div className="flex items-center gap-8">
@@ -494,7 +494,7 @@ export default function AppShell({
                       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
                     }
                   }}
-                  className="ml-3 w-56 bg-transparent text-base text-ink placeholder:text-muted-soft focus:outline-hidden"
+                  className="ml-3 w-40 bg-transparent text-base text-ink placeholder:text-muted-soft focus:outline-hidden xl:w-56"
                   suppressHydrationWarning
                 />
               </div>
@@ -587,17 +587,17 @@ export default function AppShell({
        * ===================================================== */}
 
       <div
-        className={`mx-auto grid grid-cols-1 gap-5 px-4 py-6 lg:px-0 ${contentGridClass} ${
+        className={`mx-auto grid grid-cols-1 gap-5 px-4 py-6 pb-24 lg:pb-6 ${contentGridClass} ${
           fullWidth
-            ? "w-full max-w-none px-6 lg:px-10"
-            : "max-w-[calc(100vw-200px)]"
+            ? "w-full max-w-none px-4 md:px-6 lg:px-10"
+            : "w-full lg:px-8 xl:max-w-[calc(100vw-200px)] xl:px-0"
         }`}
       >
         {/* =================================================
          * 왼쪽 사이드바
          * ================================================= */}
 
-        <aside className="hidden md:block">
+        <aside className="hidden xl:block">
           <Suspense
             fallback={
               <div className="sticky top-28 space-y-5">
@@ -625,7 +625,7 @@ export default function AppShell({
          * ================================================= */}
 
         {(!fullWidth || rightSidebar) && (
-          <aside className="hidden md:block">
+          <aside className="hidden xl:block">
             <div className="sticky top-28">{rightSidebar}</div>
           </aside>
         )}
