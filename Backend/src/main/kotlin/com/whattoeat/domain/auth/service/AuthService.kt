@@ -136,18 +136,21 @@ class AuthService(
     fun logout(accessToken: String?, refreshToken: String?) {
         // accessToken은 블랙리스트 등록과 userId 추출에 모두 필요하므로, JwtUtil.getTokenInfo로
         // 한 번만 파싱해서 재사용한다(getRemainingExpiration/getUserId를 따로 부르면 같은
-        // 토큰을 두 번 파싱하게 된다).
-        val accessTokenUserId = accessToken?.takeIf { it.isNotBlank() }?.let { token ->
-            runCatching {
-                val info = jwtUtil.getTokenInfo(token)
-                if (info.remainingMillis > 0) {
-                    redisTemplate.opsForValue().set("blacklist:${token}", "logout", info.remainingMillis, TimeUnit.MILLISECONDS)
+        // 토큰을 두 번 파싱하게 된다). 단, userId 추출(파싱)과 블랙리스트 등록(Redis I/O)은
+        // 실패 도메인이 다르므로 하나의 runCatching으로 묶지 않는다 - 묶으면 파싱엔 성공해서
+        // 이미 알아낸 userId가 있는데도, 블랙리스트 등록만 실패해도 그 userId까지 함께
+        // 버려져서 정작 이 메서드가 보장하려는 refreshToken 무효화가 스킵될 수 있다.
+        val info = accessToken?.takeIf { it.isNotBlank() }?.let { token ->
+            val parsed = runCatching { jwtUtil.getTokenInfo(token) }.getOrNull()
+            if (parsed != null && parsed.remainingMillis > 0) {
+                runCatching {
+                    redisTemplate.opsForValue().set("blacklist:${token}", "logout", parsed.remainingMillis, TimeUnit.MILLISECONDS)
                 }
-                info.userId
-            }.getOrNull()
+            }
+            parsed
         }
 
-        val userId = accessTokenUserId ?: resolveUserId(refreshToken)
+        val userId = info?.userId ?: resolveUserId(refreshToken)
         if (userId != null) {
             runCatching { redisTemplate.delete("refresh:${userId}") }
         }

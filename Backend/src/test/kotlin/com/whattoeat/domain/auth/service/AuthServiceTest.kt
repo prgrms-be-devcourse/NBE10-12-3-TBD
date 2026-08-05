@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.*
 import org.mockito.BDDMockito.given
+import org.mockito.BDDMockito.willThrow
 import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
@@ -362,5 +363,29 @@ internal class AuthServiceTest {
         given(redisTemplate.delete("refresh:$userId")).willThrow(RuntimeException("redis down"))
 
         assertThatCode { authService.logout(token, null) }.doesNotThrowAnyException()
+    }
+
+    @Test
+    @DisplayName("블랙리스트 등록(Redis set)이 실패해도 이미 얻은 userId로 refreshToken은 정상 무효화")
+    fun logoutStillInvalidatesRefreshTokenWhenBlacklistSetFails() {
+        val token = "valid.jwt.token"
+        val userId = 1L
+
+        given(jwtUtil.getTokenInfo(token)).willReturn(JwtUtil.TokenInfo(userId, 3600000L))
+        given(redisTemplate.opsForValue()).willReturn(valueOperations)
+        willThrow(RuntimeException("redis set failed"))
+            .given(valueOperations)
+            .set(
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.anyLong(),
+                ArgumentMatchers.any(TimeUnit::class.java),
+            )
+
+        authService.logout(token, null)
+
+        // 토큰 파싱은 이미 성공해 userId를 알고 있으므로, 블랙리스트 등록만 실패했다고
+        // refreshToken 무효화까지 함께 스킵되면 안 된다.
+        Mockito.verify(redisTemplate, Mockito.times(1)).delete("refresh:$userId")
     }
 }
