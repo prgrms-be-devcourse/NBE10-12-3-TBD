@@ -13,6 +13,6 @@ data class FeedUpdateRequest(
     @field:Positive(message = "장소 Id는 음수일 수 없습니다.")
     val restaurantId: Long?,
     val deleteImage: Boolean,
-    // null이면 기존 moodTag 유지 (수정 화면에서 선택하지 않으면 지워지지 않도록)
+    // null이면 기존 moodTag를 해제
     val moodTag: MoodTag?,
 )

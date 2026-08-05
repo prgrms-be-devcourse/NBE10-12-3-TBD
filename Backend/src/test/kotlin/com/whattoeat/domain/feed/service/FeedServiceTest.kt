@@ -237,7 +237,7 @@ class FeedServiceTest {
     }
 
     @Test
-    @DisplayName("피드 수정 성공 - moodTag가 있으면 변경, 없으면 기존 유지")
+    @DisplayName("피드 수정 성공 - moodTag를 변경하거나 해제")
     fun updateFeed_moodTag() {
         val user = createTestUser(1L, "testUser")
         val image: MultipartFile? = null
@@ -250,9 +250,9 @@ class FeedServiceTest {
         val changed = feedService.updateFeed(1L, 1L, FeedUpdateRequest("수정", null, false, MoodTag.DATE), image)
         assertThat(changed.moodTag).isEqualTo(MoodTag.DATE)
 
-        // moodTag 미전송 시 기존 값 유지
-        val kept = feedService.updateFeed(1L, 1L, FeedUpdateRequest("수정2", null, false, null), image)
-        assertThat(kept.moodTag).isEqualTo(MoodTag.DATE)
+        // 수정 화면에서 moodTag를 해제하면 null로 변경됨
+        val cleared = feedService.updateFeed(1L, 1L, FeedUpdateRequest("수정2", null, false, null), image)
+        assertThat(cleared.moodTag).isNull()
     }
 
     @Test
