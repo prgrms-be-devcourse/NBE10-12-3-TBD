@@ -293,6 +293,22 @@ internal class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("로그아웃 시 저장된 refreshToken도 함께 무효화")
+    fun logoutRemovesRefreshToken() {
+        val token = "valid.jwt.token"
+        val userId = 1L
+        val remaining = 3600000L
+
+        given(jwtUtil.getRemainingExpiration(token)).willReturn(remaining)
+        given(jwtUtil.getUserId(token)).willReturn(userId)
+        given(redisTemplate.opsForValue()).willReturn(valueOperations)
+
+        authService.logout(token)
+
+        Mockito.verify(redisTemplate, Mockito.times(1)).delete("refresh:$userId")
+    }
+
+    @Test
     @DisplayName("만료된 토큰으로 로그아웃 시 Redis에 저장하지 않음")
     fun logoutWithExpiredToken() {
         val token = "expired.jwt.token"

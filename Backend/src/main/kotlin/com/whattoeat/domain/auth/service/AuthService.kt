@@ -132,5 +132,10 @@ class AuthService(
         if (remaining > 0) {
             redisTemplate.opsForValue().set("blacklist:${token}", "logout", remaining, TimeUnit.MILLISECONDS)
         }
+        // accessToken만 블랙리스트에 올리고 refreshToken을 그대로 두면, 로그아웃 후에도
+        // 탈취된(혹은 남아있는) refreshToken으로 /reissue를 호출해 새 accessToken을 계속
+        // 발급받을 수 있다. 로그아웃 시 refreshToken 자체를 무효화해야 한다.
+        val userId = jwtUtil.getUserId(token)
+        redisTemplate.delete("refresh:${userId}")
     }
 }
