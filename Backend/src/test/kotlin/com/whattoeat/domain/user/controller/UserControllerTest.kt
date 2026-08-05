@@ -214,7 +214,7 @@ class UserControllerTest {
     @Test
     fun updateProfileImage_성공() {
         val response = createResponse(1L, "testUser", "/uploads/uuid.jpg", true, false)
-        given(imageUploadService.upload(any(MultipartFile::class.java))).willReturn("/uploads/uuid.jpg")
+        given(imageUploadService.uploadProfileImage(any(MultipartFile::class.java))).willReturn("/uploads/uuid.jpg")
         given(userService.updateProfileImage(1L, "/uploads/uuid.jpg")).willReturn(response)
 
         val image = MockMultipartFile(

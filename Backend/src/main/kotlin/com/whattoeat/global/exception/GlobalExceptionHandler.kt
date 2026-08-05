@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
+import org.springframework.web.multipart.MaxUploadSizeExceededException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
@@ -141,6 +142,10 @@ class GlobalExceptionHandler {
     @ExceptionHandler(InvalidImageFormatException::class)
     fun handleInvalidImageFormat(e: InvalidImageFormatException): ResponseEntity<ErrorResponse> =
         badRequest(e.message)
+
+    @ExceptionHandler(MaxUploadSizeExceededException::class)
+    fun handleMaxUploadSizeExceeded(e: MaxUploadSizeExceededException): ResponseEntity<ErrorResponse> =
+        status(HttpStatus.PAYLOAD_TOO_LARGE, "이미지 파일은 10MB 이하로 업로드할 수 있습니다.")
 
     @ExceptionHandler(InvalidRecommendParameterException::class)
     fun handleInvalidRecommendParameter(e: InvalidRecommendParameterException): ResponseEntity<ErrorResponse> =

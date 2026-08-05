@@ -67,7 +67,7 @@ class UserController(
         @AuthenticationPrincipal userDetails: CustomUserDetails,
         @RequestParam("image") image: MultipartFile
     ): ResponseEntity<RsData<UserProfileResponse>> {
-        val imageUrl = imageUploadService.upload(image)
+        val imageUrl = imageUploadService.uploadProfileImage(image)
         val response = userService.updateProfileImage(userDetails.userId, imageUrl)
         return ResponseEntity.ok(RsData.success(response, "프로필 이미지가 변경되었습니다."))
     }
