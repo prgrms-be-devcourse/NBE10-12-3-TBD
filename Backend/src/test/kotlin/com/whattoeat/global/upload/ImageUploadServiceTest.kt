@@ -1,16 +1,38 @@
 package com.whattoeat.global.upload
 
+import com.whattoeat.global.exception.InvalidImageFormatException
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.util.ReflectionTestUtils
 import java.awt.Color
 import java.awt.image.BufferedImage
+import java.nio.file.Files
 import java.nio.file.Path
 import javax.imageio.ImageIO
 
 class ImageUploadServiceTest {
+
+    @Test
+    fun `이미지 저장 전에 실패하면 임시 파일을 남기지 않는다`(@TempDir uploadDir: Path) {
+        val service = ImageUploadService()
+        ReflectionTestUtils.setField(service, "uploadPath", uploadDir.toString())
+        ReflectionTestUtils.setField(service, "urlPrefix", "/uploads/")
+
+        assertThatThrownBy {
+            service.upload(MockMultipartFile("image", "broken.jpg", "image/jpeg", "not-an-image".toByteArray()))
+        }.isInstanceOf(InvalidImageFormatException::class.java)
+
+        val entries = Files.list(uploadDir)
+        val entryCount = try {
+            entries.count()
+        } finally {
+            entries.close()
+        }
+        assertThat(entryCount).isZero()
+    }
 
     @Test
     fun `일반 업로드는 이미지 비율을 변경하지 않는다`(@TempDir uploadDir: Path) {

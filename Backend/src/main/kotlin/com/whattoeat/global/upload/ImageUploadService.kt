@@ -9,8 +9,10 @@ import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 import javax.imageio.ImageIO
 import kotlin.math.min
@@ -50,21 +52,45 @@ class ImageUploadService {
 
         val stored = "${UUID.randomUUID()}.$ext"
         val target = dir.resolve(stored)
-        val image = file.inputStream.use { ImageIO.read(it) }
-            ?: throw InvalidImageFormatException("이미지 파일을 읽을 수 없습니다.")
+        val temporary = Files.createTempFile(dir, ".upload-", ".$ext")
 
-        val normalized = normalizeImage(image, squareCrop)
-        if (normalized === image) {
-            file.transferTo(target)
-        } else {
-            val bytes = ByteArrayOutputStream().use { output ->
-                if (!ImageIO.write(normalized, ext, output)) {
-                    throw InvalidImageFormatException("지원하지 않는 이미지 형식입니다: $ext")
+        try {
+            val image = file.inputStream.use { ImageIO.read(it) }
+                ?: throw InvalidImageFormatException("이미지 파일을 읽을 수 없습니다.")
+
+            val normalized = normalizeImage(image, squareCrop)
+            if (normalized === image) {
+                file.inputStream.use { input ->
+                    Files.newOutputStream(temporary).use { output ->
+                        input.copyTo(output)
+                    }
                 }
-                output.toByteArray()
+            } else {
+                val bytes = ByteArrayOutputStream().use { output ->
+                    if (!ImageIO.write(normalized, ext, output)) {
+                        throw InvalidImageFormatException("지원하지 않는 이미지 형식입니다: $ext")
+                    }
+                    output.toByteArray()
+                }
+                Files.write(temporary, bytes)
+                normalized.flush()
             }
-            Files.write(target, bytes)
-            normalized.flush()
+
+            try {
+                Files.move(
+                    temporary,
+                    target,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (e: Exception) {
+            runCatching { Files.deleteIfExists(target) }
+            throw e
+        } finally {
+            runCatching { Files.deleteIfExists(temporary) }
         }
 
         val prefix = if (urlPrefix.endsWith("/")) urlPrefix else "$urlPrefix/"
