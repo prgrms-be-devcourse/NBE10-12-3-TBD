@@ -63,9 +63,8 @@ interface NotificationRepository : JpaRepository<Notification, Long> {
         type: NotificationType
     ): Boolean
 
-    // 좋아요/팔로우/리스트 저장을 취소할 때 그에 대응하는 알림도 함께 지운다. 지우지 않으면
-    // 위 existsBy... 중복 방지 체크가 영원히 true로 남아, 취소 후 다시 좋아요/팔로우/저장을
-    // 해도 상대방에게 다시는 알림이 가지 않는다.
+    // 좋아요/팔로우/리스트 저장 취소 시 대응하는 알림을 지우는 용도. 호출부(FeedLikeService
+    // 등) 주석 참고.
     fun deleteByReceiverIdAndActorIdAndFeedIdAndType(
         receiverId: Long,
         actorId: Long,
