@@ -131,24 +131,28 @@ class AuthService(
     // accessToken이 없어도 refreshToken만으로 로그아웃 처리가 가능해야 한다. 안 그러면
     // 로그인 후 1시간이 지나서 로그아웃할 때 accessToken 블랙리스트 등록만 건너뛰고
     // refreshToken 무효화까지 통째로 생략돼, 탈취된 refreshToken이 /reissue에 계속
-    // 쓰일 수 있다. 토큰 파싱/Redis 처리 중 실패해도 로그아웃 자체는 막지 않는다.
+    // 쓰일 수 있다. 토큰 파싱/Redis 처리 중 어느 단계가 실패해도(만료/위변조된 토큰,
+    // Redis 장애 등) 예외를 밖으로 던지지 않고 로그아웃 자체는 항상 성공 처리한다.
     fun logout(accessToken: String?, refreshToken: String?) {
-        if (!accessToken.isNullOrBlank()) {
+        // accessToken은 블랙리스트 등록과 userId 추출에 모두 필요하므로, JwtUtil.getTokenInfo로
+        // 한 번만 파싱해서 재사용한다(getRemainingExpiration/getUserId를 따로 부르면 같은
+        // 토큰을 두 번 파싱하게 된다).
+        val accessTokenUserId = accessToken?.takeIf { it.isNotBlank() }?.let { token ->
             runCatching {
-                val remaining = jwtUtil.getRemainingExpiration(accessToken)
-                if (remaining > 0) {
-                    redisTemplate.opsForValue().set("blacklist:${accessToken}", "logout", remaining, TimeUnit.MILLISECONDS)
+                val info = jwtUtil.getTokenInfo(token)
+                if (info.remainingMillis > 0) {
+                    redisTemplate.opsForValue().set("blacklist:${token}", "logout", info.remainingMillis, TimeUnit.MILLISECONDS)
                 }
-            }
+                info.userId
+            }.getOrNull()
         }
 
-        val userId = accessToken?.takeIf { it.isNotBlank() }
-            ?.let { runCatching { jwtUtil.getUserId(it) }.getOrNull() }
-            ?: refreshToken?.takeIf { it.isNotBlank() }
-                ?.let { runCatching { jwtUtil.getUserId(it) }.getOrNull() }
-
+        val userId = accessTokenUserId ?: resolveUserId(refreshToken)
         if (userId != null) {
-            redisTemplate.delete("refresh:${userId}")
+            runCatching { redisTemplate.delete("refresh:${userId}") }
         }
     }
+
+    private fun resolveUserId(token: String?): Long? =
+        token?.takeIf { it.isNotBlank() }?.let { runCatching { jwtUtil.getUserId(it) }.getOrNull() }
 }

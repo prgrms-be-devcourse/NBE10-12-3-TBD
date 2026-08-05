@@ -64,4 +64,14 @@ class JwtUtil {
 
     fun getRemainingExpiration(token: String): Long =
         parseToken(token).expiration.time - System.currentTimeMillis()
+
+    // userId와 남은 만료 시간을 동시에 써야 하는 호출부(로그아웃 등)가 getUserId/
+    // getRemainingExpiration을 따로 부르면 같은 토큰을 두 번 파싱하게 되므로, 한 번만
+    // 파싱해서 둘 다 얻을 수 있게 묶어서 제공한다.
+    fun getTokenInfo(token: String): TokenInfo {
+        val claims = parseToken(token)
+        return TokenInfo(claims.subject.toLong(), claims.expiration.time - System.currentTimeMillis())
+    }
+
+    data class TokenInfo(val userId: Long, val remainingMillis: Long)
 }
