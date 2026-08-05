@@ -13,9 +13,6 @@ data class FeedUpdateRequest(
     @field:Positive(message = "장소 Id는 음수일 수 없습니다.")
     val restaurantId: Long?,
     val deleteImage: Boolean,
-    // null이면 기존 moodTag 유지 (수정 화면에서 선택하지 않으면 지워지지 않도록).
-    // 사용자가 수정 화면에서 태그를 명시적으로 해제한 경우에는 moodTag가 null인 것만으로는
-    // "유지"와 "삭제"를 구분할 수 없으므로 clearMoodTag로 삭제 의도를 별도로 전달받는다.
+    // null이면 기존 moodTag를 해제
     val moodTag: MoodTag?,
-    val clearMoodTag: Boolean = false,
 )

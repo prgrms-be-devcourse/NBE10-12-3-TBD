@@ -42,3 +42,6 @@ next-env.d.ts
 
 # raw region geojson sources
 /scripts/*.geojson
+
+# 모바일 반응형 검증 스크린샷 산출물
+/mobile-shots/

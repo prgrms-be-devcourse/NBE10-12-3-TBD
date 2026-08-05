@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MapPin, Navigation, Search, X } from "lucide-react";
 import Link from "next/link";
 import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
+import BottomSheet from "@/components/BottomSheet";
 import { apiFetchJson } from "@/lib/api";
 import { KAKAO_JS_KEY, KAKAO_KEY_MISSING_MESSAGE } from "@/lib/kakao";
 
@@ -262,6 +263,304 @@ function parseSearchQuery(searchQuery: string): ParsedSearchQuery {
   };
 }
 
+interface SearchFormProps {
+  mounted: boolean;
+  query: string;
+  loading: boolean;
+  activeCategory: string;
+  onQueryChange: (value: string) => void;
+  onClear: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onCurrentLocation: () => void;
+  onCategoryChange: (category: string) => void;
+}
+
+/**
+ * 검색 입력 + 지우기 + 현재 위치 + 검색 버튼 + 카테고리 칩
+ *
+ * 모바일 뜨는 검색창과 데스크톱 패널에서 공유
+ */
+function SearchForm({
+  mounted,
+  query,
+  loading,
+  activeCategory,
+  onQueryChange,
+  onClear,
+  onSubmit,
+  onCurrentLocation,
+  onCategoryChange,
+}: SearchFormProps) {
+  return (
+    <form onSubmit={onSubmit}>
+      {/* 검색 입력 */}
+      <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface-soft px-3 py-1.5">
+        <Search className="h-5 w-5 shrink-0 text-muted" />
+
+        {mounted && (
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-hidden placeholder:text-muted-soft"
+            placeholder="지역, 식당, 카페, 디저트 검색"
+          />
+        )}
+        {query && (
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="검색어 지우기"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-ink"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={onCurrentLocation}
+          disabled={loading}
+          aria-label="현재 위치"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-hairline bg-white text-primary transition-colors hover:bg-surface-strong disabled:opacity-60"
+        >
+          <Navigation className="h-4 w-4" />
+        </button>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-primary-active disabled:opacity-70"
+        >
+          {loading ? "검색 중" : "검색"}
+        </button>
+      </div>
+
+      {/* 카테고리 */}
+      <div className="mt-2 flex gap-1.5 overflow-x-auto">
+        {categories.map((category) => (
+          <button
+            key={category}
+            type="button"
+            onClick={() => onCategoryChange(category)}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+              category === activeCategory
+                ? "bg-primary text-white"
+                : "bg-surface-soft text-muted hover:bg-hairline-soft"
+            }`}
+          >
+            {category}
+          </button>
+        ))}
+      </div>
+    </form>
+  );
+}
+
+interface ResultBoardProps {
+  results: KakaoRestaurant[];
+  loading: boolean;
+  loadingMore: boolean;
+  error: string;
+  hoveredPlaceId: string | null;
+  listContainerRef: React.RefObject<HTMLDivElement | null>;
+  onResultScroll: (event: React.UIEvent<HTMLDivElement>) => void;
+  onHover: (placeId: string | null) => void;
+  onSelect: (restaurant: KakaoRestaurant) => void;
+}
+
+/**
+ * 목록 헤더 + 결과 스크롤 영역 + 추가 로딩 푸터
+ *
+ * 데스크톱 패널과 모바일 바텀시트에서 공유
+ */
+function ResultBoard({
+  results,
+  loading,
+  loadingMore,
+  error,
+  hoveredPlaceId,
+  listContainerRef,
+  onResultScroll,
+  onHover,
+  onSelect,
+}: ResultBoardProps) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* 목록 헤더 */}
+      <div className="shrink-0 border-b border-hairline-soft px-5 py-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-ink">검색 결과</h2>
+
+            <p className="mt-1 text-xs text-muted">
+              {results[0]?.region2
+                ? `${results[0].region2} 주변 장소`
+                : "현재 지역에서 찾은 장소"}
+            </p>
+          </div>
+
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">
+            {results.length}개
+          </span>
+        </div>
+      </div>
+
+      {/* 검색 결과 */}
+      <div
+        ref={listContainerRef}
+        onScroll={onResultScroll}
+        className="min-h-0 flex-1 overflow-y-auto"
+      >
+        {loading && results.length === 0 ? (
+          <div className="flex h-full items-center justify-center px-6">
+            <p className="text-sm text-muted">
+              검색 결과를 불러오는 중입니다.
+            </p>
+          </div>
+        ) : error ? (
+          <div className="flex h-full items-center justify-center px-6">
+            <p className="text-center text-sm text-red-500">{error}</p>
+          </div>
+        ) : results.length === 0 ? (
+          <div className="flex h-full items-center justify-center px-6">
+            <p className="text-center text-sm text-muted">
+              검색 결과가 없습니다.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-hairline-soft">
+            {results.map((restaurant, index) => (
+              <button
+                data-place-id={restaurant.kakaoPlaceId}
+                key={restaurant.kakaoPlaceId}
+                type="button"
+                onMouseEnter={() => {
+                  onHover(restaurant.kakaoPlaceId);
+                }}
+                onMouseLeave={() => {
+                  onHover(null);
+                }}
+                onFocus={() => {
+                  onHover(restaurant.kakaoPlaceId);
+                }}
+                onBlur={() => {
+                  onHover(null);
+                }}
+                onClick={() => onSelect(restaurant)}
+                className={`group flex w-full gap-4 px-4 py-4 text-left transition-colors ${
+                  hoveredPlaceId === restaurant.kakaoPlaceId
+                    ? "bg-primary/5"
+                    : "hover:bg-surface-soft"
+                }`}
+              >
+                {/* 장소 순번 */}
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                  {index + 1}
+                </div>
+
+                {/* 장소 정보 */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="line-clamp-1 text-sm font-bold text-ink group-hover:text-primary">
+                      {restaurant.name}
+                    </h3>
+
+                    <span className="shrink-0 text-[11px] text-muted">
+                      {restaurant.region2}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 line-clamp-1 text-xs text-muted">
+                    {getDisplayCategory(restaurant.category)}
+                  </p>
+
+                  <div className="mt-2 flex items-start gap-1.5">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
+
+                    <p className="line-clamp-2 text-xs leading-5 text-body">
+                      {restaurant.roadAddress || restaurant.address}
+                    </p>
+                  </div>
+
+                  {restaurant.phone && (
+                    <p className="mt-1.5 text-xs text-muted">
+                      {restaurant.phone}
+                    </p>
+                  )}
+                </div>
+
+                {/* 썸네일 */}
+                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-strong">
+                  <img
+                    src="/restaurant-placeholder.png"
+                    alt={restaurant.name}
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                  />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 추가 결과 로딩 */}
+      {loadingMore && (
+        <div className="shrink-0 border-t border-hairline-soft px-4 py-3">
+          <p className="text-center text-xs text-muted">
+            장소를 더 불러오는 중입니다.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface HotPlaceListProps {
+  hotPlaces: HotPlace[];
+}
+
+/**
+ * 오늘의 핫플 목록
+ *
+ * 데스크톱 사이드바와 모바일 초기 시트에서 공유
+ */
+function HotPlaceList({ hotPlaces }: HotPlaceListProps) {
+  return (
+    <div className="space-y-4">
+      {hotPlaces.length === 0 ? (
+        <p className="text-sm text-muted">등록된 식당이 없습니다.</p>
+      ) : (
+        hotPlaces.map((place, index) => (
+          <Link
+            key={place.id}
+            href={`/restaurant/${place.id}`}
+            className="flex items-start gap-3 rounded-lg p-2 -m-2 transition-colors hover:bg-primary/5"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+              {index + 1}
+            </span>
+
+            <div>
+              <p className="text-base font-bold text-ink">
+                {place.name}
+              </p>
+
+              <p className="text-sm text-muted">
+                {categoryLabelMap[place.category] || place.category}
+
+                {" · "}
+
+                {place.region2 || "-"}
+              </p>
+            </div>
+          </Link>
+        ))
+      )}
+    </div>
+  );
+}
+
 function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -299,6 +598,9 @@ function SearchPage() {
    */
   const [showResearchButton, setShowResearchButton] = useState(false);
 
+  /** 모바일 결과 시트 스냅: 0=슬쩍, 1=반쯤, 2=전체 */
+  const [sheetSnap, setSheetSnap] = useState(0);
+
   /**
    * 검색, 현재 위치 이동처럼 코드가 지도를 움직이는 동안에는
    * "이 지역 다시 검색" 버튼을 표시하지 않음
@@ -314,6 +616,11 @@ function SearchPage() {
    * 검색 결과 리스트 영역
    */
   const listContainerRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * 모바일 시트의 검색 결과 리스트 영역
+   */
+  const mobileListContainerRef = useRef<HTMLDivElement>(null);
 
   /**
    * 실제 카카오 지도 객체
@@ -655,6 +962,28 @@ function SearchPage() {
   }, []);
 
   /**
+   * 번호 마커 클릭 시 결과 목록의 해당 항목으로 스크롤.
+   * 데스크톱 패널/모바일 시트 중 실제로 보이는 쪽의 항목을 찾는다.
+   */
+  const scrollToPlace = (placeId: string) => {
+    const containers = [listContainerRef.current, mobileListContainerRef.current];
+
+    for (const container of containers) {
+      if (!container) continue;
+
+      const element = container.querySelector<HTMLElement>(
+        `[data-place-id="${placeId}"]`,
+      );
+
+      if (element && element.offsetParent !== null) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+  };
+
+
+  /**
    * 검색 결과가 바뀌면
    * 번호가 표시된 지도 마커를 다시 생성
    */
@@ -693,7 +1022,8 @@ function SearchPage() {
         "aria-label",
         `${index + 1}번 ${restaurant.name}`,
       );
-      markerElement.dataset.placeId = restaurant.kakaoPlaceId;
+      // 호버 강조 대상은 지도 마커뿐이어야 하므로 목록 버튼의 data-place-id와 구분
+      markerElement.dataset.markerId = restaurant.kakaoPlaceId;
 
       markerElement.style.width = "34px";
       markerElement.style.height = "34px";
@@ -722,12 +1052,8 @@ function SearchPage() {
       });
 
       markerElement.addEventListener("click", () => {
-        document
-          .getElementById(`place-${restaurant.kakaoPlaceId}`)
-          ?.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
+        setSheetSnap((prev) => (prev === 0 ? 1 : prev)); // 시트가 슬쩍 상태면 반쯤 올림
+        scrollToPlace(restaurant.kakaoPlaceId);
       });
 
       const overlay = new maps.CustomOverlay({
@@ -790,25 +1116,27 @@ function SearchPage() {
        * CustomOverlay 내부 DOM을 직접 찾기 어려우므로
        * 번호 마커에 식당 ID를 부여해서 검색
        */
-      const markerElement = document.querySelector<HTMLButtonElement>(
-        `[data-place-id="${restaurant.kakaoPlaceId}"]`,
+      const markerElements = document.querySelectorAll<HTMLButtonElement>(
+        `[data-marker-id="${restaurant.kakaoPlaceId}"]`,
       );
-
-      if (!markerElement) {
-        return;
-      }
 
       const isActive = restaurant.kakaoPlaceId === hoveredPlaceId;
 
-      markerElement.style.transform = isActive
-        ? "scale(1.28) translateY(-2px)"
-        : "scale(1)";
+      /**
+       * 호버 강조는 지도 위 번호 마커에만 적용
+       * (목록 버튼은 data-place-id라 이 셀렉터에 안 걸림)
+       */
+      markerElements.forEach((markerElement) => {
+        markerElement.style.transform = isActive
+          ? "scale(1.28) translateY(-2px)"
+          : "scale(1)";
 
-      markerElement.style.boxShadow = isActive
-        ? "0 6px 18px rgba(0, 0, 0, 0.35)"
-        : "0 3px 10px rgba(0, 0, 0, 0.25)";
+        markerElement.style.boxShadow = isActive
+          ? "0 6px 18px rgba(0, 0, 0, 0.35)"
+          : "0 3px 10px rgba(0, 0, 0, 0.25)";
 
-      markerElement.style.zIndex = isActive ? "10" : "1";
+        markerElement.style.zIndex = isActive ? "10" : "1";
+      });
     });
   }, [hoveredPlaceId, results]);
 
@@ -1911,6 +2239,18 @@ function SearchPage() {
   };
 
   /**
+   * 검색어 지우기
+   */
+  const handleClearQuery = () => {
+    createSearchRequestId();
+    setQuery("");
+    setResults([]);
+    setError("");
+    setHoveredPlaceId(null);
+    resetPagination();
+  };
+
+  /**
    * 카테고리 변경
    */
   const handleCategoryChange = async (category: string) => {
@@ -2118,258 +2458,102 @@ function SearchPage() {
           <SidebarProfile />
 
           <SidebarCard title="오늘의 핫플">
-            <div className="space-y-4">
-              {hotPlaces.length === 0 ? (
-                <p className="text-sm text-muted">등록된 식당이 없습니다.</p>
-              ) : (
-                hotPlaces.map((place, index) => (
-                  <Link
-                    key={place.id}
-                    href={`/restaurant/${place.id}`}
-                    className="flex items-start gap-3 rounded-lg p-2 -m-2 transition-colors hover:bg-primary/5"
-                  >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                      {index + 1}
-                    </span>
-
-                    <div>
-                      <p className="text-base font-bold text-ink">
-                        {place.name}
-                      </p>
-
-                      <p className="text-sm text-muted">
-                        {categoryLabelMap[place.category] || place.category}
-
-                        {" · "}
-
-                        {place.region2 || "-"}
-                      </p>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
+            <HotPlaceList hotPlaces={hotPlaces} />
           </SidebarCard>
         </div>
       }
     >
-      <div className="relative h-[calc(100vh-6.5rem)] overflow-hidden rounded-2xl border border-hairline-soft">
+      <div className="search-map-viewport relative overflow-hidden rounded-2xl border border-hairline-soft lg:h-[calc(100vh-6.5rem)] lg:min-h-0">
         {/* 지도 */}
         <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
-        {/* 이 지역 다시 검색 */}
+
+        {/* 이 지역 다시 검색 — 데스크톱: 패널 오른쪽, 모바일: 검색창 아래 중앙 */}
         {showResearchButton && (
           <button
             type="button"
             onClick={handleResearchCurrentArea}
             disabled={loading}
-            className="absolute left-[calc(50%+200px)] top-5 z-30 -translate-x-1/2 rounded-full border border-hairline-soft bg-white px-5 py-2.5 text-sm font-bold text-ink shadow-lg transition-all hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="absolute left-1/2 top-[7rem] z-30 -translate-x-1/2 rounded-full border border-hairline-soft bg-white px-3 py-1 text-xs font-bold text-ink shadow-lg transition-all hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 lg:left-[calc(50%+200px)] lg:top-5"
           >
             {loading ? "검색 중..." : "이 지역 다시 검색"}
           </button>
         )}
 
-        {/* 검색 결과 세로 목록 */}
-        <div className="absolute bottom-4 left-4 top-4 z-20 w-[400px]">
-          <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-hairline-soft bg-surface/95 shadow-xl backdrop-blur">
-            {/* 검색창 + 카테고리 */}
-            <form
+        {/* 모바일: 지도 위에 뜨는 검색창 + 카테고리 (lg 미만) */}
+        <div className="absolute inset-x-3 top-2 z-20 lg:hidden">
+          <div className="rounded-2xl border border-hairline-soft bg-surface/95 p-2 shadow-lg backdrop-blur">
+            <SearchForm
+              mounted={mounted}
+              query={query}
+              loading={loading}
+              activeCategory={activeCategory}
+              onQueryChange={handleQueryChange}
+              onClear={handleClearQuery}
               onSubmit={handleSubmit}
-              className="shrink-0 border-b border-hairline-soft bg-surface px-4 py-4"
-            >
-              {/* 검색 입력 */}
-              <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface-soft px-3 py-2.5">
-                <Search className="h-5 w-5 shrink-0 text-muted" />
-
-                {mounted && (
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => handleQueryChange(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-hidden placeholder:text-muted-soft"
-                    placeholder="지역, 식당, 카페, 디저트 검색"
-                  />
-                )}
-                {query && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      createSearchRequestId();
-                      setQuery("");
-                      setResults([]);
-                      setError("");
-                      setHoveredPlaceId(null);
-                      resetPagination();
-                    }}
-                    aria-label="검색어 지우기"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-ink"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleCurrentLocation}
-                  disabled={loading}
-                  aria-label="현재 위치"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-hairline bg-white text-primary transition-colors hover:bg-surface-strong disabled:opacity-60"
-                >
-                  <Navigation className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary-active disabled:opacity-70"
-                >
-                  {loading ? "검색 중" : "검색"}
-                </button>
-              </div>
-
-              {/* 카테고리 */}
-              <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => handleCategoryChange(category)}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      category === activeCategory
-                        ? "bg-primary text-white"
-                        : "bg-surface-soft text-muted hover:bg-hairline-soft"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </form>
-            {/* 목록 헤더 */}
-            <div className="shrink-0 border-b border-hairline-soft px-5 py-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-ink">검색 결과</h2>
-
-                  <p className="mt-1 text-xs text-muted">
-                    {results[0]?.region2
-                      ? `${results[0].region2} 주변 장소`
-                      : "현재 지역에서 찾은 장소"}
-                  </p>
-                </div>
-
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">
-                  {results.length}개
-                </span>
-              </div>
-            </div>
-
-            {/* 검색 결과 */}
-            <div
-              ref={listContainerRef}
-              onScroll={handleResultScroll}
-              className="min-h-0 flex-1 overflow-y-auto"
-            >
-              {loading && results.length === 0 ? (
-                <div className="flex h-full items-center justify-center px-6">
-                  <p className="text-sm text-muted">
-                    검색 결과를 불러오는 중입니다.
-                  </p>
-                </div>
-              ) : error ? (
-                <div className="flex h-full items-center justify-center px-6">
-                  <p className="text-center text-sm text-red-500">{error}</p>
-                </div>
-              ) : results.length === 0 ? (
-                <div className="flex h-full items-center justify-center px-6">
-                  <p className="text-center text-sm text-muted">
-                    검색 결과가 없습니다.
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-hairline-soft">
-                  {results.map((restaurant, index) => (
-                    <button
-                      id={`place-${restaurant.kakaoPlaceId}`}
-                      key={restaurant.kakaoPlaceId}
-                      type="button"
-                      onMouseEnter={() => {
-                        setHoveredPlaceId(restaurant.kakaoPlaceId);
-                      }}
-                      onMouseLeave={() => {
-                        setHoveredPlaceId(null);
-                      }}
-                      onFocus={() => {
-                        setHoveredPlaceId(restaurant.kakaoPlaceId);
-                      }}
-                      onBlur={() => {
-                        setHoveredPlaceId(null);
-                      }}
-                      onClick={() => handleSelect(restaurant)}
-                      className={`group flex w-full gap-4 px-4 py-4 text-left transition-colors ${
-                        hoveredPlaceId === restaurant.kakaoPlaceId
-                          ? "bg-primary/5"
-                          : "hover:bg-surface-soft"
-                      }`}
-                    >
-                      {/* 장소 순번 */}
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                        {index + 1}
-                      </div>
-
-                      {/* 장소 정보 */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <h3 className="line-clamp-1 text-sm font-bold text-ink group-hover:text-primary">
-                            {restaurant.name}
-                          </h3>
-
-                          <span className="shrink-0 text-[11px] text-muted">
-                            {restaurant.region2}
-                          </span>
-                        </div>
-
-                        <p className="mt-1 line-clamp-1 text-xs text-muted">
-                          {getDisplayCategory(restaurant.category)}
-                        </p>
-
-                        <div className="mt-2 flex items-start gap-1.5">
-                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
-
-                          <p className="line-clamp-2 text-xs leading-5 text-body">
-                            {restaurant.roadAddress || restaurant.address}
-                          </p>
-                        </div>
-
-                        {restaurant.phone && (
-                          <p className="mt-1.5 text-xs text-muted">
-                            {restaurant.phone}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* 썸네일 */}
-                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-strong">
-                        <img
-                          src="/restaurant-placeholder.png"
-                          alt={restaurant.name}
-                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                        />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 추가 결과 로딩 */}
-            {loadingMore && (
-              <div className="shrink-0 border-t border-hairline-soft px-4 py-3">
-                <p className="text-center text-xs text-muted">
-                  장소를 더 불러오는 중입니다.
-                </p>
-              </div>
-            )}
+              onCurrentLocation={handleCurrentLocation}
+              onCategoryChange={handleCategoryChange}
+            />
           </div>
+        </div>
+
+        {/* 데스크톱: 왼쪽 400px 패널 (lg 이상, 기존 모습 유지) */}
+        <div className="absolute bottom-4 left-4 top-4 z-20 hidden w-[400px] lg:block">
+          <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-hairline-soft bg-surface/95 shadow-xl backdrop-blur">
+            <div className="shrink-0 border-b border-hairline-soft bg-surface px-4 py-4">
+              <SearchForm
+                mounted={mounted}
+                query={query}
+                loading={loading}
+                activeCategory={activeCategory}
+                onQueryChange={handleQueryChange}
+                onClear={handleClearQuery}
+                onSubmit={handleSubmit}
+                onCurrentLocation={handleCurrentLocation}
+                onCategoryChange={handleCategoryChange}
+              />
+            </div>
+
+            <ResultBoard
+              results={results}
+              loading={loading}
+              loadingMore={loadingMore}
+              error={error}
+              hoveredPlaceId={hoveredPlaceId}
+              listContainerRef={listContainerRef}
+              onResultScroll={handleResultScroll}
+              onHover={setHoveredPlaceId}
+              onSelect={handleSelect}
+            />
+          </div>
+        </div>
+
+        {/* 모바일: 드래그 결과 시트 (lg 미만) */}
+        <div className="lg:hidden">
+          <BottomSheet
+            snaps={[0.2, 0.5, 0.85]}
+            snap={sheetSnap}
+            onSnapChange={setSheetSnap}
+          >
+            {results.length === 0 && !loading && !error && !query.trim() ? (
+              /* 검색 전 초기 상태: 오늘의 핫플 (사이드바 콘텐츠 흡수) */
+              <div className="h-full overflow-y-auto px-4 pb-4">
+                <p className="mb-3 text-base font-bold text-ink">오늘의 핫플</p>
+                <HotPlaceList hotPlaces={hotPlaces} />
+              </div>
+            ) : (
+              <ResultBoard
+                results={results}
+                loading={loading}
+                loadingMore={loadingMore}
+                error={error}
+                hoveredPlaceId={hoveredPlaceId}
+                listContainerRef={mobileListContainerRef}
+                onResultScroll={handleResultScroll}
+                onHover={setHoveredPlaceId}
+                onSelect={handleSelect}
+              />
+            )}
+          </BottomSheet>
         </div>
       </div>
     </AppShell>

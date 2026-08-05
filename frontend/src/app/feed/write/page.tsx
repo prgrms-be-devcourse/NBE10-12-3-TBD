@@ -370,13 +370,10 @@ function WritePostContent() {
 
     if (isEditMode) {
       formData.append("content", content.trim());
+      // moodTag를 보내지 않으면 서버가 기존 값을 해제한다(FeedUpdateRequest 참고).
+      // 사용자가 태그를 해제한 경우 그대로 아무것도 보내지 않으면 된다.
       if (selectedMood) {
         formData.append("moodTag", selectedMood);
-      } else {
-        // moodTag를 보내지 않으면 서버는 "변경 요청 없음"으로 해석해 기존 태그를 그대로
-        // 둔다. 사용자가 수정 화면에서 태그를 해제한 것을 실제로 반영하려면 삭제 의도를
-        // 명시적으로 알려야 한다.
-        formData.append("clearMoodTag", "true");
       }
       if (restaurantId !== null) {
         formData.append("restaurantId", String(restaurantId));

@@ -504,6 +504,41 @@ function FeedContent() {
           </Link>
         </div>
 
+        {/* 추천 푸디 — 사이드바 콘텐츠 흡수 (xl 미만) */}
+        {recommendFoodies.length > 0 && (
+          <div className="xl:hidden">
+            <p className="mb-2 text-sm font-bold text-ink">추천 푸디</p>
+
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {recommendFoodies.map((f) => (
+                <div
+                  key={f.userId}
+                  className="w-44 shrink-0 rounded-2xl border border-hairline-soft bg-surface p-4"
+                >
+                  <Link
+                    href={`/profile/${f.userId}`}
+                    className="flex items-center gap-3"
+                  >
+                    <img
+                      src={getImageUrl(f.profileImage) ?? "/default-profile.png"}
+                      alt=""
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                    <p className="truncate text-sm font-bold text-ink">{f.nickname}</p>
+                  </Link>
+
+                  <button
+                    onClick={() => handleFollow(f.userId)}
+                    className="mt-3 w-full rounded-full bg-primary px-3.5 py-1.5 text-sm font-bold text-white transition-colors hover:bg-primary-active"
+                  >
+                    팔로우
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Feed cards */}
         {loading ? (
           <div className="space-y-4">

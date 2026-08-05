@@ -12,11 +12,13 @@ import {
   Search,
   LogOut,
   Settings,
+  ArrowUp,
 } from "lucide-react";
 import { CurrentUser, getStoredUser, setStoredUser } from "@/lib/user";
 
 import { apiFetchJson, getImageUrl } from "@/lib/api";
 import { NotificationBell } from "@/components/NotificationBell";
+import BottomTabBar from "@/components/BottomTabBar";
 
 /* =========================================================
  * 사용자 응답
@@ -335,6 +337,25 @@ export default function AppShell({
   const [searchQuery, setSearchQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  /* ---------------------------------------------------------
+   * 위로가기 버튼 표시 여부
+   * --------------------------------------------------------- */
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 400);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
   /* =========================================================
    * 로그인 상태 변경
    * ========================================================= */
@@ -455,9 +476,9 @@ export default function AppShell({
 
   const contentGridClass = fullWidth
     ? rightSidebar
-      ? "md:grid-cols-[300px_minmax(0,1fr)_300px]"
-      : "md:grid-cols-[300px_minmax(0,1fr)]"
-    : "md:grid-cols-[300px_minmax(0,1fr)_300px]";
+      ? "xl:grid-cols-[300px_minmax(0,1fr)_300px]"
+      : "xl:grid-cols-[300px_minmax(0,1fr)]"
+    : "xl:grid-cols-[300px_minmax(0,1fr)_300px]";
 
   /* =========================================================
    * 화면
@@ -470,7 +491,7 @@ export default function AppShell({
        * ===================================================== */}
 
       <header className="sticky top-0 z-30 border-b border-hairline-soft bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex h-[100px] max-w-[calc(100vw-200px)] items-center px-4 lg:px-0">
+        <div className="mx-auto flex h-16 w-full items-center px-4 md:h-[100px] lg:px-8 xl:max-w-[calc(100vw-200px)] xl:px-0">
           {/* 왼쪽 */}
 
           <div className="flex items-center gap-8">
@@ -495,7 +516,7 @@ export default function AppShell({
                       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
                     }
                   }}
-                  className="ml-3 w-56 bg-transparent text-base text-ink placeholder:text-muted-soft focus:outline-hidden"
+                  className="ml-3 w-40 bg-transparent text-base text-ink placeholder:text-muted-soft focus:outline-hidden xl:w-56"
                   suppressHydrationWarning
                 />
               </div>
@@ -527,7 +548,7 @@ export default function AppShell({
 
           {/* 알림 / 프로필 */}
 
-          <div className="ml-8 flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3 lg:ml-8">
             <NotificationBell />
 
             <div className="relative" ref={menuRef}>
@@ -588,17 +609,17 @@ export default function AppShell({
        * ===================================================== */}
 
       <div
-        className={`mx-auto grid grid-cols-1 gap-5 px-4 py-6 lg:px-0 ${contentGridClass} ${
+        className={`mx-auto grid grid-cols-1 gap-5 px-4 py-6 pb-24 lg:pb-6 ${contentGridClass} ${
           fullWidth
-            ? "w-full max-w-none px-6 lg:px-10"
-            : "max-w-[calc(100vw-200px)]"
+            ? "w-full max-w-none px-4 md:px-6 lg:px-10"
+            : "w-full lg:px-8 xl:max-w-[calc(100vw-200px)] xl:px-0"
         }`}
       >
         {/* =================================================
          * 왼쪽 사이드바
          * ================================================= */}
 
-        <aside className="hidden md:block">
+        <aside className="hidden xl:block">
           <Suspense
             fallback={
               <div className="sticky top-28 space-y-5">
@@ -626,11 +647,26 @@ export default function AppShell({
          * ================================================= */}
 
         {(!fullWidth || rightSidebar) && (
-          <aside className="hidden md:block">
+          <aside className="hidden xl:block">
             <div className="sticky top-28">{rightSidebar}</div>
           </aside>
         )}
       </div>
+
+      {/* 하단 탭바 (lg 미만) */}
+      <BottomTabBar />
+
+      {/* 위로가기 버튼 (스크롤 시 표시, 모바일은 탭바 위) */}
+      {showBackToTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="맨 위로"
+          className="fixed bottom-20 right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-hairline-soft bg-surface/80 text-ink shadow-lg backdrop-blur transition-colors hover:bg-surface lg:bottom-6"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </button>
+      )}
     </div>
   );
 }

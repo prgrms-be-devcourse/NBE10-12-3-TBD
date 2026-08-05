@@ -18,7 +18,7 @@ import { moodLabel } from "@/lib/mood";
 import { buildListHref } from "@/lib/listNavigation";
 import { getStoredUser } from "@/lib/user";
 
-const tabs = ["내 리스트", "포스트", "저장함"] as const;
+const tabs = ["리스트", "포스트", "저장함"] as const;
 type ProfileTab = (typeof tabs)[number];
 
 /* =========================================================
@@ -135,7 +135,7 @@ export default function ProfilePage() {
    * 탭
    * --------------------------------------------------------- */
 
-  const [activeTab, setActiveTab] = useState<ProfileTab>("내 리스트");
+  const [activeTab, setActiveTab] = useState<ProfileTab>("리스트");
 
   const [tabLoading, setTabLoading] = useState(false);
 
@@ -146,7 +146,7 @@ export default function ProfilePage() {
       const tab = new URLSearchParams(window.location.search).get("tab");
       const nextTab: ProfileTab = tabs.includes(tab as ProfileTab)
         ? (tab as ProfileTab)
-        : "내 리스트";
+        : "리스트";
 
       setActiveTab((current) => (current === nextTab ? current : nextTab));
     };
@@ -277,7 +277,7 @@ export default function ProfilePage() {
          * 리스트
          * ===================================================== */
 
-        if (activeTab === "내 리스트") {
+        if (activeTab === "리스트") {
           /* 내 프로필 */
 
           if (user.isOwnProfile) {
@@ -382,7 +382,7 @@ export default function ProfilePage() {
 
         setTabError("프로필 탭을 불러오는 중 오류가 발생했습니다.");
 
-        if (activeTab === "내 리스트") {
+        if (activeTab === "리스트") {
           setMyLists([]);
 
           setListPage(0);
@@ -831,7 +831,7 @@ export default function ProfilePage() {
                * 리스트
                * ================================================= */}
 
-              {activeTab === "내 리스트" && (
+              {activeTab === "리스트" && (
                 <>
                   {myLists.length === 0 ? (
                     !tabError && (

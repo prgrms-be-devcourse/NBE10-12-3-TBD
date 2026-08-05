@@ -118,6 +118,33 @@ function categoryLabel(enumValue: string): string {
   return found ? found[0] : enumValue;
 }
 
+/** 오늘의 핫플 목록 — 데스크톱 사이드바와 모바일 흡수 섹션에서 공유 */
+function HotPlaceList({ hotPlaces }: { hotPlaces: HotPlace[] }) {
+  if (hotPlaces.length === 0) {
+    return <p className="text-sm text-muted">등록된 식당이 없습니다.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {hotPlaces.map((p, i) => (
+        <Link
+          key={p.id}
+          href={`/restaurant/${p.id}`}
+          className="flex items-start gap-3 rounded-lg p-2 -m-2 transition-colors hover:bg-primary/5"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+            {i + 1}
+          </span>
+          <div>
+            <p className="text-base font-bold text-ink">{p.name}</p>
+            <p className="text-sm text-muted">{categoryLabel(p.category)} · {p.region2 || "-"}</p>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 export default function RecommendPage() {
   const router = useRouter();
 
@@ -547,27 +574,7 @@ export default function RecommendPage() {
         <div className="sticky top-28 space-y-5">
           <SidebarProfile />
           <SidebarCard title="오늘의 핫플">
-            <div className="space-y-4">
-              {hotPlaces.length === 0 ? (
-                <p className="text-sm text-muted">등록된 식당이 없습니다.</p>
-              ) : (
-                hotPlaces.map((p, i) => (
-                  <Link
-                    key={p.id}
-                    href={`/restaurant/${p.id}`}
-                    className="flex items-start gap-3 rounded-lg p-2 -m-2 transition-colors hover:bg-primary/5"
-                  >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                      {i + 1}
-                    </span>
-                    <div>
-                      <p className="text-base font-bold text-ink">{p.name}</p>
-                      <p className="text-sm text-muted">{categoryLabel(p.category)} · {p.region2 || "-"}</p>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
+            <HotPlaceList hotPlaces={hotPlaces} />
           </SidebarCard>
         </div>
       }
@@ -640,7 +647,7 @@ export default function RecommendPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-hairline-soft pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline-soft pt-5">
             <div className="flex gap-2">
               {sorts.map(({ key, label, icon: Icon }) => (
                 <button
@@ -664,12 +671,21 @@ export default function RecommendPage() {
             </button>
           </div>
         </div>
+
+        {/* 사이드바 콘텐츠 흡수 (xl 미만) */}
+        {hotPlaces.length > 0 && (
+          <div className="rounded-2xl border border-hairline-soft bg-surface p-6 shadow-sm xl:hidden">
+            <p className="mb-4 text-base font-bold text-ink">오늘의 핫플</p>
+
+            <HotPlaceList hotPlaces={hotPlaces} />
+          </div>
+        )}
       </div>
 
       {/* Location modal */}
       {locationModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl animate-in fade-in-50 zoom-in-95">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-xl animate-in fade-in-50 zoom-in-95">
             <div className="flex items-center justify-between border-b border-hairline-soft pb-3">
               <h3 className="text-base font-bold text-ink">위치 선택</h3>
               <button onClick={() => setLocationModalOpen(false)} className="text-muted hover:text-ink">
@@ -677,13 +693,13 @@ export default function RecommendPage() {
               </button>
             </div>
 
-            <div className="mt-4 grid h-72 grid-cols-4 gap-2">
+            <div className="mt-4 grid h-72 grid-cols-4 gap-1.5 sm:gap-2">
               <div className="overflow-y-auto rounded-lg border border-hairline-soft bg-surface-soft">
                 {region1List.map((r1) => (
                   <button
                     key={r1}
                     onClick={() => handleRegion1Change(r1)}
-                    className={`block w-full px-3 py-2 text-left text-sm ${
+                    className={`block w-full px-2 py-2 text-left text-xs sm:px-3 sm:text-sm ${
                       selectedRegion1 === r1 ? "bg-primary text-white" : "text-ink hover:bg-white"
                     }`}
                   >
@@ -697,7 +713,7 @@ export default function RecommendPage() {
                   <button
                     key={r2}
                     onClick={() => handleRegion2Change(r2)}
-                    className={`block w-full px-3 py-2 text-left text-sm ${
+                    className={`block w-full px-2 py-2 text-left text-xs sm:px-3 sm:text-sm ${
                       selectedRegion2 === r2 ? "bg-primary text-white" : "text-ink hover:bg-white"
                     }`}
                   >
@@ -711,7 +727,7 @@ export default function RecommendPage() {
                   <button
                     key={r3}
                     onClick={() => handleRegion3Change(r3)}
-                    className={`block w-full px-3 py-2 text-left text-sm ${
+                    className={`block w-full px-2 py-2 text-left text-xs sm:px-3 sm:text-sm ${
                       selectedRegion3 === r3 ? "bg-primary text-white" : "text-ink hover:bg-white"
                     }`}
                   >
@@ -725,7 +741,7 @@ export default function RecommendPage() {
                   <button
                     key={r4}
                     onClick={() => setSelectedRegion4(r4)}
-                    className={`block w-full px-3 py-2 text-left text-sm ${
+                    className={`block w-full px-2 py-2 text-left text-xs sm:px-3 sm:text-sm ${
                       selectedRegion4 === r4 ? "bg-primary text-white" : "text-ink hover:bg-white"
                     }`}
                   >
@@ -748,7 +764,7 @@ export default function RecommendPage() {
       {/* Result modal */}
       {resultModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl bg-surface p-8 shadow-2xl animate-in fade-in-50 zoom-in-95">
+          <div className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl bg-surface p-5 shadow-2xl animate-in fade-in-50 zoom-in-95 sm:p-8">
             <div className="mb-6 flex items-center justify-between border-b border-hairline-soft pb-3">
               <div className="text-center">
                 <p className="text-sm font-bold text-primary mb-1">오늘의 추천</p>
@@ -803,7 +819,7 @@ export default function RecommendPage() {
                 )}
 
                 {/* Map */}
-                <div className="relative mb-5 h-48 w-full overflow-hidden rounded-2xl border border-hairline-soft">
+                <div className="relative mb-4 h-48 w-full overflow-hidden rounded-2xl border border-hairline-soft sm:h-56">
                   <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
                   <button
                     onClick={() => {
@@ -829,10 +845,10 @@ export default function RecommendPage() {
 
                 {/* Draft card */}
                 <div className="rounded-2xl bg-surface border border-hairline-soft overflow-hidden shadow-sm">
-                  <div className="aspect-[16/10] w-full bg-primary-soft flex items-center justify-center text-7xl">
+                  <div className="flex h-16 w-full items-center justify-center bg-primary-soft text-4xl sm:h-20">
                     {categoryEmoji[currentLabel] || "🍽\uFE0F"}
                   </div>
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary-active">
                         {currentLabel}
