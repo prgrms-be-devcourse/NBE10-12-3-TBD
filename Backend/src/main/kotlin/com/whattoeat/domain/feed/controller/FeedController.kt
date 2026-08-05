@@ -80,9 +80,10 @@ class FeedController(
         @RequestParam(value = "restaurantId", required = false) restaurantId: Long?,
         @RequestParam(value = "deleteImage", required = false, defaultValue = "false") deleteImage: Boolean,
         @RequestParam(value = "moodTag", required = false) moodTag: MoodTag?,
+        @RequestParam(value = "clearMoodTag", required = false, defaultValue = "false") clearMoodTag: Boolean,
         @RequestPart(value = "image", required = false) image: MultipartFile?,
     ): RsData<FeedDetailResponse> {
-        val feedUpdateRequest = FeedUpdateRequest(content, restaurantId, deleteImage, moodTag)
+        val feedUpdateRequest = FeedUpdateRequest(content, restaurantId, deleteImage, moodTag, clearMoodTag)
         val response = feedService.updateFeed(id, userDetails.userId, feedUpdateRequest, image)
         return RsData.success(response, "피드가 수정되었습니다.")
     }

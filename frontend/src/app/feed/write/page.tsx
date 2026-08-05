@@ -78,6 +78,12 @@ function WritePostContent() {
   const [feedImageFile, setFeedImageFile] = useState<File | null>(null);
   const [feedImagePreview, setFeedImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 언마운트 시 정리 effect에서 최신 미리보기 값을 읽기 위한 ref (effect는 마운트 시
+  // 한 번만 등록되므로 state를 직접 의존성에 넣지 않고 ref로 최신값을 따라간다).
+  const feedImagePreviewRef = useRef<string | null>(null);
+  useEffect(() => {
+    feedImagePreviewRef.current = feedImagePreview;
+  }, [feedImagePreview]);
 
   useEffect(() => {
     if (!isEditMode || !editFeedId) return;
@@ -273,6 +279,14 @@ function WritePostContent() {
     );
   };
 
+  // 서버에서 내려온 이미지 URL(수정 모드 초기값)은 revokeObjectURL 대상이 아니므로
+  // blob: 미리보기만 골라서 해제한다.
+  const revokeBlobPreview = (preview: string | null) => {
+    if (preview?.startsWith("blob:")) {
+      URL.revokeObjectURL(preview);
+    }
+  };
+
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -285,6 +299,9 @@ function WritePostContent() {
 
     try {
       const resized = await resizeImageToInstagram(file);
+      // 이전에 만든 blob 미리보기 URL을 해제하지 않으면, 사진을 여러 번 바꿔 고를 때마다
+      // 브라우저 메모리에 계속 쌓인다.
+      revokeBlobPreview(feedImagePreview);
       setFeedImageFile(resized);
       setFeedImagePreview(URL.createObjectURL(resized));
     } catch {
@@ -294,12 +311,18 @@ function WritePostContent() {
   };
 
   const handleRemoveImage = () => {
-    if (feedImagePreview) {
-      URL.revokeObjectURL(feedImagePreview);
-    }
+    revokeBlobPreview(feedImagePreview);
     setFeedImageFile(null);
     setFeedImagePreview(null);
   };
+
+  // 미리보기를 바꾸지 않고(예: 사진을 고른 채로) 다른 페이지로 이동해 컴포넌트가
+  // 언마운트되는 경우에도 마지막 blob URL은 해제해야 한다.
+  useEffect(() => {
+    return () => {
+      revokeBlobPreview(feedImagePreviewRef.current);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,6 +372,11 @@ function WritePostContent() {
       formData.append("content", content.trim());
       if (selectedMood) {
         formData.append("moodTag", selectedMood);
+      } else {
+        // moodTag를 보내지 않으면 서버는 "변경 요청 없음"으로 해석해 기존 태그를 그대로
+        // 둔다. 사용자가 수정 화면에서 태그를 해제한 것을 실제로 반영하려면 삭제 의도를
+        // 명시적으로 알려야 한다.
+        formData.append("clearMoodTag", "true");
       }
       if (restaurantId !== null) {
         formData.append("restaurantId", String(restaurantId));

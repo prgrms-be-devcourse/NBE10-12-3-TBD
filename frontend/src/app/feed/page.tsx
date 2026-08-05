@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -87,6 +87,7 @@ function FeedContent() {
   const [hasMore, setHasMore] = useState(true);
   const [recommendCursor, setRecommendCursor] = useState<number | null>(null);
   const [recommendPool, setRecommendPool] = useState<Feed[]>([]);
+  const [recommendExhausted, setRecommendExhausted] = useState(false);
   const [recommendFoodies, setRecommendFoodies] = useState<RecommendFoodie[]>(
     [],
   );
@@ -106,10 +107,17 @@ function FeedContent() {
   // 안에서 loadingMore를 true→false로 되돌리면 배칭 때문에 true인 상태가 화면에 반영조차
   // 안 된다. recommendPool 자체가 이미 최신 진실이므로 그걸 그대로 잘라 쓰면 충분하다.
   const recommendVisibleCount = (page + 1) * RECOMMEND_PAGE_SIZE;
-  const displayedPosts =
-    activeTab === "recommended"
-      ? recommendPool.slice(0, recommendVisibleCount)
-      : posts;
+  // recommendPool.slice()는 매 렌더링마다 새 배열을 만들어내므로, 그걸 그대로 하이라이트
+  // effect의 의존성으로 쓰면 댓글 모달/메뉴 열기 같은 무관한 렌더링에서도 매번 새 배열로
+  // 인식되어 스크롤이 재실행된다. 실제 데이터(recommendPool/posts)나 페이지가 바뀔 때만
+  // 새 배열을 만들도록 useMemo로 안정화한다.
+  const displayedPosts = useMemo(
+    () =>
+      activeTab === "recommended"
+        ? recommendPool.slice(0, recommendVisibleCount)
+        : posts,
+    [activeTab, recommendPool, recommendVisibleCount, posts],
+  );
   const canLoadMore =
     activeTab === "recommended"
       ? recommendVisibleCount < recommendPool.length
@@ -121,16 +129,25 @@ function FeedContent() {
       ? pickUniqueFoodies(recommendPool, currentUserId)
       : recommendFoodies;
 
-  // highlight 파라미터가 있으면 해당 피드로 스크롤 + 하이라이트 (알림 클릭 진입)
+  // highlight 파라미터가 있으면 해당 피드로 스크롤 + 하이라이트 (알림 클릭 진입).
+  // 대상 피드가 아직 로드된 페이지 안에 없으면(알림이 오래된 글을 가리키는 경우) 화면에
+  // 아무 반응도 없는 것처럼 보였다. displayedPosts/canLoadMore가 바뀔 때마다 다시 찾아보고,
+  // 못 찾았는데 더 불러올 수 있으면 자동으로 다음 페이지를 이어서 불러온다.
   useEffect(() => {
     if (!highlightFeedId || loading) return;
     const el = document.getElementById(`feed-${highlightFeedId}`);
-    if (!el) return;
+    if (!el) {
+      if (canLoadMore && !loadingMore) {
+        const timer = setTimeout(() => setPage((prev) => prev + 1), 0);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     el.classList.add("ring-2", "ring-primary");
     const timer = setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2000);
     return () => clearTimeout(timer);
-  }, [highlightFeedId, loading, displayedPosts]);
+  }, [highlightFeedId, loading, loadingMore, displayedPosts, canLoadMore]);
 
   const handleOpenComments = (feedId: number) => {
     setActiveCommentFeedId(feedId);
@@ -144,12 +161,15 @@ function FeedContent() {
 
   // 추천 탭의 displayedPosts는 recommendPool에서 파생되므로, 좋아요/댓글/삭제 같은 변경은
   // posts뿐 아니라 recommendPool에도 반영해야 화면에 그대로 유지된다.
-  const updatePostEverywhere = (feedId: number, updater: (post: Feed) => Feed) => {
-    const apply = (prev: Feed[]) =>
-      prev.map((post) => (post.feedId === feedId ? updater(post) : post));
-    setPosts(apply);
-    setRecommendPool(apply);
-  };
+  const updatePostEverywhere = useCallback(
+    (feedId: number, updater: (post: Feed) => Feed) => {
+      const apply = (prev: Feed[]) =>
+        prev.map((post) => (post.feedId === feedId ? updater(post) : post));
+      setPosts(apply);
+      setRecommendPool(apply);
+    },
+    [],
+  );
 
   const removePostEverywhere = (feedId: number) => {
     const apply = (prev: Feed[]) => prev.filter((post) => post.feedId !== feedId);
@@ -166,9 +186,26 @@ function FeedContent() {
     setRecommendPool(apply);
   };
 
-  const handleCommentCountChange = (feedId: number, count: number) => {
-    updatePostEverywhere(feedId, (post) => ({ ...post, commentCount: count }));
-  };
+  const handleCommentCountChange = useCallback(
+    (feedId: number, count: number) => {
+      updatePostEverywhere(feedId, (post) => ({ ...post, commentCount: count }));
+    },
+    [updatePostEverywhere],
+  );
+
+  // CommentModal의 useEffect는 [feedId, onCountChange]를 의존성으로 쓴다. 여기서 매 렌더링마다
+  // 새 인라인 함수를 넘기면(예전 방식) onCountChange가 매번 바뀐 것으로 보여 effect가 다시
+  // 실행되고, 다시 불러온 댓글 수를 onCountChange로 보고하면 posts/recommendPool이 갱신되어
+  // 또 리렌더링이 발생하는 무한 루프(댓글 목록 계속 재요청)가 생긴다. activeCommentFeedId가
+  // 바뀔 때만 참조가 바뀌도록 고정해서 이 루프를 막는다.
+  const handleModalCommentCountChange = useCallback(
+    (count: number) => {
+      if (activeCommentFeedId !== null) {
+        handleCommentCountChange(activeCommentFeedId, count);
+      }
+    },
+    [activeCommentFeedId, handleCommentCountChange],
+  );
 
   useEffect(() => {
     apiFetchJson<{
@@ -244,7 +281,15 @@ function FeedContent() {
       );
 
       if (res.ok && res.data) {
-        setRecommendPool(res.data);
+        if (res.data.length === 0 && recommendCursor !== null) {
+          // 마지막 배치까지 다 받아온 상태(새로고침으로 더 오래된 후보를 요청했지만
+          // 남은 게 없음). 기존 목록을 비우지 않고 "더 이상 없음" 상태만 표시한다.
+          setRecommendExhausted(true);
+        } else {
+          setRecommendPool(res.data);
+          setRecommendExhausted(false);
+          setPage(0);
+        }
       } else {
         setError(res.message || "피드를 불러오지 못했습니다.");
         setRecommendPool([]);
@@ -260,8 +305,11 @@ function FeedContent() {
     if (recommendPool.length === 0) return;
     const oldestFeedId = Math.min(...recommendPool.map((post) => post.feedId));
     setRecommendCursor(oldestFeedId);
-    setRecommendPool([]);
-    setPage(0);
+  };
+
+  const handleResetRecommend = () => {
+    setRecommendExhausted(false);
+    setRecommendCursor(null);
   };
 
   // 추천 탭은 displayedFoodies가 recommendPool에서 직접 파생하므로, 여기서는 팔로잉 탭에
@@ -352,6 +400,7 @@ function FeedContent() {
     setPosts([]);
     setRecommendCursor(null);
     setRecommendPool([]);
+    setRecommendExhausted(false);
     router.replace(`/feed?tab=${tab}`, { scroll: false });
   };
 
@@ -609,7 +658,21 @@ function FeedContent() {
             {!loadingMore &&
               !canLoadMore &&
               activeTab === "recommended" &&
-              displayedPosts.length > 0 && (
+              displayedPosts.length > 0 &&
+              (recommendExhausted ? (
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <p className="text-sm text-muted">
+                    더 이상 추천할 피드가 없습니다.
+                  </p>
+                  <button
+                    onClick={handleResetRecommend}
+                    className="flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-4 py-2 text-sm font-bold text-ink hover:bg-surface-soft transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    처음 추천으로 돌아가기
+                  </button>
+                </div>
+              ) : (
                 <div className="flex flex-col items-center gap-2 py-6">
                   <p className="text-sm text-muted">
                     새로운 추천을 더 받아볼까요?
@@ -622,7 +685,7 @@ function FeedContent() {
                     새로고침
                   </button>
                 </div>
-              )}
+              ))}
           </div>
         )}
       </div>
@@ -630,9 +693,7 @@ function FeedContent() {
         <CommentModal
           feedId={activeCommentFeedId}
           onClose={handleCloseComments}
-          onCountChange={(count) =>
-            handleCommentCountChange(activeCommentFeedId, count)
-          }
+          onCountChange={handleModalCommentCountChange}
         />
       )}
     </AppShell>

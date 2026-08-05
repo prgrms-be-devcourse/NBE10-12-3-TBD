@@ -262,6 +262,12 @@ class FeedServiceTest {
         // moodTag 미전송 시 기존 값 유지
         val kept = feedService.updateFeed(1L, 1L, FeedUpdateRequest("수정2", null, false, null), image)
         assertThat(kept.moodTag).isEqualTo(MoodTag.DATE)
+
+        // clearMoodTag 전송 시 기존 값 삭제
+        val cleared = feedService.updateFeed(
+            1L, 1L, FeedUpdateRequest("수정3", null, false, null, clearMoodTag = true), image,
+        )
+        assertThat(cleared.moodTag).isNull()
     }
 
     @Test

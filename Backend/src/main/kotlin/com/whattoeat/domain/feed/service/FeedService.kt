@@ -334,8 +334,13 @@ import org.springframework.web.multipart.MultipartFile
         }
 
         feed.update(request.content, restaurant, imageUrl)
-        // moodTag는 값이 있을 때만 변경 (미전송 시 기존 값 유지)
-        request.moodTag?.let { feed.moodTag = it }
+        // moodTag는 값이 있을 때만 변경(미전송 시 기존 값 유지). clearMoodTag가 true면
+        // 사용자가 수정 화면에서 태그를 명시적으로 해제한 것이므로 기존 값을 지운다.
+        if (request.clearMoodTag) {
+            feed.moodTag = null
+        } else {
+            request.moodTag?.let { feed.moodTag = it }
+        }
         return FeedDetailResponse.from(feedRepository.save(feed))
     }
 
