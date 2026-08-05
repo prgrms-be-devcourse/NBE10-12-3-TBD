@@ -17,6 +17,7 @@ import AppShell, { SidebarCard, SidebarProfile } from "@/components/AppShell";
 import { apiFetchJson } from "@/lib/api";
 import { MOOD_TAGS, moodLabel, type MoodTagValue } from "@/lib/mood";
 import { parseListSearchParams, type ListTab } from "@/lib/listNavigation";
+import { getStoredUser } from "@/lib/user";
 
 /* =========================================================
  * 리스트 목록
@@ -1145,8 +1146,12 @@ function ListsPage() {
    * 사이드바 리스트 클릭
    * ========================================================= */
 
-  const handleSelectSidebarList = (listId: number) => {
-    const isMyList = myLists.some((list) => list.id === listId);
+  const handleSelectSidebarList = (listId: number, listUserId: number) => {
+    // myLists는 "내 리스트" 탭의 첫 페이지(10개)만 들고 있어서, 사이드바(인기/최근)에서
+    // 클릭한 내 리스트가 그 안에 없으면(11번째 이후) 남의 리스트로 잘못 분류돼
+    // 수정/삭제 버튼 대신 "저장" 버튼이 뜨는 문제가 있었다. 목록 포함 여부 대신 실제
+    // 작성자 id를 로그인한 사용자와 비교한다.
+    const isMyList = listUserId === getStoredUser()?.userId;
 
     setActiveTab(isMyList ? "my" : "other");
 
@@ -1694,7 +1699,7 @@ function ListsPage() {
                       <button
                         key={list.id}
                         type="button"
-                        onClick={() => handleSelectSidebarList(list.id)}
+                        onClick={() => handleSelectSidebarList(list.id, list.userId)}
                         className="block w-full rounded-xl bg-surface-soft p-4 text-left transition-colors hover:bg-hairline-soft/50"
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -1732,7 +1737,7 @@ function ListsPage() {
                     <button
                       key={list.id}
                       type="button"
-                      onClick={() => handleSelectSidebarList(list.id)}
+                      onClick={() => handleSelectSidebarList(list.id, list.userId)}
                       className="block w-full rounded-xl bg-surface-soft p-4 text-left transition-colors hover:bg-hairline-soft/50"
                     >
                       <div className="flex items-center justify-between gap-2">

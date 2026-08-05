@@ -32,9 +32,11 @@ class RestaurantList protected constructor() : BaseEntity() {
     lateinit var description: String
         protected set
 
-    // 분위기 태그
-    @Enumerated(EnumType.ORDINAL)
-    @Column(name = "mood_tag", length = 50)
+    // 분위기 태그. ORDINAL로 저장하면 MoodTag enum 선언 순서가 그대로 DB 값이 되므로,
+    // 나중에 태그를 추가/삭제/재배치하기만 해도 기존에 저장된 리스트들의 태그가 에러 없이
+    // 조용히 다른 값으로 바뀐다(Feed.moodTag는 원래부터 STRING으로 저장해 이 문제가 없다).
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mood_tag", length = 20)
     var moodTag: MoodTag? = null
         protected set
 

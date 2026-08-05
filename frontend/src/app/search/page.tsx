@@ -1632,6 +1632,7 @@ function SearchPage() {
   const fetchKeywordInCurrentMap = (
     keyword: string,
     category: string,
+    requestId = createSearchRequestId(),
   ): Promise<void> => {
     if (!map) {
       setError("지도를 불러오는 중입니다.");
@@ -1671,6 +1672,15 @@ function SearchPage() {
           status: string,
           pagination: KakaoPagination,
         ) => {
+          /**
+           * 이 검색보다 나중에 실행된 검색이 있으면
+           * 오래된 응답은 화면 상태를 변경하지 않음
+           */
+          if (!isLatestSearchRequest(requestId)) {
+            resolve();
+            return;
+          }
+
           /**
            * 현재 지도 키워드 검색의 페이지네이션 저장
            */
