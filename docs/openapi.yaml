@@ -12,8 +12,10 @@ info:
   version: 1.0.0
 
 servers:
-  - url: https://api.example.com
-    description: Production Server
+  - url: https://api.whattoeats.app
+    description: Production server
+  - url: http://localhost:8080
+    description: Local server
 
 security:
   - bearerAuth: []
@@ -860,6 +862,7 @@ paths:
                       region1: "서울"
                       region2: "중구"
                       region3: "을지로3가"
+                      region4: null
                       phone: "02-123-4567"
                       lat: 37.5665
                       lng: 126.9780
@@ -895,52 +898,107 @@ paths:
                   message: "카카오맵 서비스와의 통신에 실패했습니다. 잠시 후 다시 시도해주세요."
 
   /api/v1/restaurants/recommend:
-    get:
+    post:
       tags: [Restaurants]
-      summary: 조건 필터 기반 맛집 추천
-      description: 현재 위치와 조건을 기반으로 맛집을 추천합니다. 인증 불필요.
+      summary: 카카오 후보 기반 맛집 추천
+      description: 카카오 장소 검색 결과 후보를 분위기·카테고리·정렬·제외 조건으로 필터링해 추천합니다. 인증 불필요.
       security: []
-      parameters:
-        - name: lat
-          in: query
-          required: true
-          description: 현재 위치 위도 (-90 ~ 90)
-          schema:
-            type: number
-            format: double
-            example: 37.5665
-        - name: lng
-          in: query
-          required: true
-          description: 현재 위치 경도 (-180 ~ 180)
-          schema:
-            type: number
-            format: double
-            example: 126.9780
-        - name: category
-          in: query
-          required: false
-          description: 음식 카테고리
-          schema:
-            type: string
-            enum: ["한식", "일식", "양식", "중식"]
-            example: "한식"
-        - name: mood
-          in: query
-          required: false
-          description: 분위기 태그
-          schema:
-            type: string
-            enum: ["데이트", "혼밥", "회식", "야식"]
-            example: "데이트"
-        - name: sort
-          in: query
-          required: true
-          description: 정렬 방식
-          schema:
-            type: string
-            enum: ["RANDOM", "RATING", "DISTANCE"]
-            example: "RATING"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidates]
+              properties:
+                candidates:
+                  type: array
+                  minItems: 1
+                  description: 카카오 장소 검색 결과 후보
+                  items:
+                    type: object
+                    required: [kakaoPlaceId, name, address, lat, lng]
+                    properties:
+                      kakaoPlaceId:
+                        type: string
+                      name:
+                        type: string
+                      categoryName:
+                        type: string
+                        nullable: true
+                      address:
+                        type: string
+                      roadAddress:
+                        type: string
+                        nullable: true
+                      region1:
+                        type: string
+                        nullable: true
+                      region2:
+                        type: string
+                        nullable: true
+                      region3:
+                        type: string
+                        nullable: true
+                      region4:
+                        type: string
+                        nullable: true
+                      phone:
+                        type: string
+                        nullable: true
+                      lat:
+                        type: number
+                        format: double
+                      lng:
+                        type: number
+                        format: double
+                category:
+                  type: string
+                  nullable: true
+                  enum: [KOREAN, WESTERN, CHINESE, JAPANESE, ASIAN, CAFE, SNACK, CHICKEN, FASTFOOD, BAR, BUFFET, SHABU, FUSION, ETC]
+                mood:
+                  type: string
+                  nullable: true
+                  enum: [DATE, FRIENDS, FAMILY, SOLO, GROUP, NIGHT]
+                sort:
+                  type: string
+                  default: RANDOM
+                  enum: [RANDOM, DISTANCE]
+                lat:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: 거리순 정렬 기준 위도
+                lng:
+                  type: number
+                  format: double
+                  nullable: true
+                  description: 거리순 정렬 기준 경도
+                exclude:
+                  type: array
+                  items:
+                    type: string
+                  description: 이미 추천한 카카오 장소 ID 목록
+            example:
+              candidates:
+                - kakaoPlaceId: "12345678"
+                  name: "을지삼겹"
+                  categoryName: "음식점 > 한식 > 육류,고기"
+                  address: "서울 중구 을지로3가 12-3"
+                  roadAddress: "서울 중구 을지로 123길 4"
+                  region1: "서울"
+                  region2: "중구"
+                  region3: "을지로3가"
+                  region4: null
+                  phone: "02-123-4567"
+                  lat: 37.5665
+                  lng: 126.978
+              category: KOREAN
+              mood: DATE
+              sort: RANDOM
+              lat: 37.5665
+              lng: 126.978
+              exclude: []
       responses:
         "200":
           description: 맛집 추천 성공
@@ -950,32 +1008,32 @@ paths:
                 success: true
                 data:
                   recommendations:
-                    - restaurantId: 1
-                      name: "을지삼겹"
-                      category: "한식"
+                    - kakaoPlaceId: "12345678"
+                      category: KOREAN
+                      categoryLabel: "한식"
                       distanceMeter: 120
-                      lat: 37.5665
-                      lng: 126.9780
+                      name: "을지삼겹"
+                      categoryName: "음식점 > 한식 > 육류,고기"
         "400":
-          description: 필수 파라미터 누락 / 좌표 범위 초과 / sort 값 오류 (MISSING_REQUIRED_PARAM / INVALID_COORDINATES / INVALID_SORT_VALUE)
+          description: 후보·좌표·정렬 값이 올바르지 않음
           content:
             application/json:
               example:
                 success: false
                 data: null
                 error:
-                  code: "MISSING_REQUIRED_PARAM"
-                  message: "필수 파라미터(lat, lng, sort)가 누락되었습니다."
+                  code: "INVALID_INPUT_VALUE"
+                  message: "추천 요청값이 올바르지 않습니다."
         "404":
-          description: 조건에 맞는 식당 없음 (NO_RECOMMENDATIONS_FOUND)
+          description: 조건에 맞는 식당 없음
           content:
             application/json:
               example:
                 success: false
                 data: null
                 error:
-                  code: "NO_RECOMMENDATIONS_FOUND"
-                  message: "조건에 맞는 맛집을 찾을 수 없습니다."
+                  code: "RESTAURANT_NOT_FOUND"
+                  message: "조건에 맞는 식당이 없습니다."
         "500":
           description: 서버 오류
           content:
@@ -1018,6 +1076,7 @@ paths:
                   region1: "서울"
                   region2: "중구"
                   region3: "을지로3가"
+                  region4: null
                   phone: "02-123-4567"
                   lat: 37.5665
                   lng: 126.9780
@@ -1070,6 +1129,11 @@ paths:
                     restaurantId:
                       type: integer
                       example: 1
+                    moodTag:
+                      type: string
+                      nullable: true
+                      enum: [DATE, FRIENDS, FAMILY, SOLO, GROUP, NIGHT]
+                      example: DATE
                 image:
                   type: string
                   format: binary
@@ -1086,11 +1150,13 @@ paths:
                   content: "오늘 을지로 삼겹살 먹었는데 대박이야!"
                   nickname: "푸디보이"
                   profileImage: "https://k.kakaocdn.net/.../img.jpg"
+                  imageUrl: null
                   likeCount: 0
                   createdAt: "2026-06-18T17:50:00"
                   updatedAt: "2026-06-18T17:50:00"
                   restaurantId: 1
                   restaurantName: "을지삼겹"
+                  moodTag: DATE
                 message: "피드가 생성되었습니다."
         "400":
           description: content 없음 또는 1000자 초과
@@ -1186,11 +1252,13 @@ paths:
                       userId: 1
                       nickname: "푸디보이"
                       profileImage: "https://k.kakaocdn.net/.../img.jpg"
+                      imageUrl: null
                       likeCount: 12
                       commentCount: 4
                       isLikedByMe: true
                       restaurantId: 1
                       restaurantName: "을지삼겹"
+                      moodTag: DATE
                       createdAt: "2026-06-18T17:50:00"
                   totalPages: 3
                   totalElements: 25
@@ -1251,11 +1319,13 @@ paths:
                       userId: 2
                       nickname: "서교동김푸디"
                       profileImage: "https://k.kakaocdn.net/.../profile2.jpg"
+                      imageUrl: null
                       likeCount: 12
                       commentCount: 4
                       isLikedByMe: false
                       restaurantId: 1
                       restaurantName: "을지삼겹"
+                      moodTag: DATE
                       createdAt: "2026-06-18T17:50:00"
                   totalPages: 3
                   totalElements: 25
@@ -1310,10 +1380,12 @@ paths:
                     userId: 3
                     nickname: "망원동고독가"
                     profileImage: "https://k.kakaocdn.net/.../profile3.jpg"
+                    imageUrl: null
                     likeCount: 5
                     commentCount: 2
                     restaurantId: 5
                     restaurantName: "망원동숨집"
+                    moodTag: DATE
                     createdAt: "2026-06-19T12:30:00"
         "401":
           description: 로그인하지 않은 사용자
@@ -1368,6 +1440,11 @@ paths:
                     restaurantId:
                       type: integer
                       example: 2
+                    moodTag:
+                      type: string
+                      nullable: true
+                      enum: [DATE, FRIENDS, FAMILY, SOLO, GROUP, NIGHT]
+                      example: DATE
                 image:
                   type: string
                   format: binary
@@ -1384,11 +1461,13 @@ paths:
                   content: "재방문했는데 여전히 맛있네요. 강력 추천합니다."
                   nickname: "푸디보이"
                   profileImage: "https://k.kakaocdn.net/.../img.jpg"
+                  imageUrl: null
                   likeCount: 12
                   createdAt: "2026-06-18T17:50:00"
                   updatedAt: "2026-06-18T18:10:00"
                   restaurantId: 2
                   restaurantName: "망원동숨집"
+                  moodTag: DATE
                 message: "피드가 수정되었습니다."
         "400":
           description: content 1000자 초과
@@ -1889,8 +1968,8 @@ paths:
                   example: "좁은 골목길 숨겨진 보석 같은 감성 맛집 모음집"
                 moodTag:
                   type: string
-                  enum: ["데이트", "혼밥", "회식", "야식"]
-                  example: "데이트"
+                  enum: [DATE, FRIENDS, FAMILY, SOLO, GROUP, NIGHT]
+                  example: DATE
       responses:
         "201":
           description: 맛집 리스트 생성 성공
@@ -1903,7 +1982,7 @@ paths:
                   userId: 1
                   title: "을지로 감성 데이트 코스"
                   description: "좁은 골목길 숨겨진 보석 같은 감성 맛집 모음집"
-                  moodTag: "데이트"
+                  moodTag: DATE
                   createdAt: "2026-06-18T17:52:00"
                 message: "맛집 리스트가 성공적으로 생성되었습니다."
         "400":
@@ -1915,7 +1994,7 @@ paths:
                 data: null
                 error:
                   code: "INVALID_MOOD_TAG"
-                  message: "허용되지 않는 분위기 태그입니다. (데이트 / 혼밥 / 회식 / 야식)"
+                  message: "허용되지 않는 분위기 태그입니다. (DATE / FRIENDS / FAMILY / SOLO / GROUP / NIGHT)"
         "401":
           description: 로그인하지 않은 사용자
           content:
@@ -1955,8 +2034,8 @@ paths:
           description: 분위기 태그 필터
           schema:
             type: string
-            enum: ["데이트", "혼밥", "회식", "야식"]
-            example: "데이트"
+            enum: [DATE, FRIENDS, FAMILY, SOLO, GROUP, NIGHT]
+            example: DATE
         - name: userId
           in: query
           required: false
@@ -1991,7 +2070,7 @@ paths:
                       userId: 1
                       nickname: "푸디보이"
                       title: "을지로 감성 데이트 코스"
-                      moodTag: "데이트"
+                      moodTag: DATE
                       itemCount: 3
                       createdAt: "2026-06-18T17:52:00"
                   totalPages: 5
@@ -2043,7 +2122,7 @@ paths:
                   creatorNickname: "푸디보이"
                   title: "을지로 감성 데이트 코스"
                   description: "좁은 골목길 숨겨진 보석 같은 감성 맛집 모음집"
-                  moodTag: "데이트"
+                  moodTag: DATE
                   items:
                     - itemId: 30
                       restaurantId: 1
@@ -2384,6 +2463,7 @@ paths:
                     actorId: 2
                     actorNickname: "서교동김푸디"
                     feedId: 45
+                    restaurantListId: null
                     type: "NEW_FEED"
                     message: "서교동김푸디님이 새 글을 작성했습니다."
                     isRead: false
@@ -2435,6 +2515,7 @@ paths:
                   actorId: 2
                   actorNickname: "서교동김푸디"
                   feedId: 45
+                  restaurantListId: null
                   type: "NEW_FEED"
                   message: "서교동김푸디님이 새 글을 작성했습니다."
                   isRead: true
