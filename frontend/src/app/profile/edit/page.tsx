@@ -91,11 +91,20 @@ export default function EditProfilePage() {
         email: json.data.email,
       });
       window.dispatchEvent(new Event("login-state-change"));
+      // user state도 함께 갱신해야 한다. 안 그러면 이번 변경은 성공했는데 바로 다음
+      // 시도가 실패했을 때, 실패 처리의 폴백(아래 else 분기)이 방금 저장된 이미지가
+      // 아니라 페이지를 처음 열었을 때의 이미지로 되돌아간다.
+      setUser({ ...json.data });
       // 업로드가 끝나면 서버가 내려준 실제 URL로 교체하고, 더 이상 필요 없는 로컬
       // blob 미리보기는 바로 해제한다.
       setPreviewImage(getImageUrl(json.data.profileImage) ?? "/default-profile.png");
     } else {
-      alert(json.message || "프로필 이미지 변경에 실패했습니다.");
+      // 401이면 apiFetch가 이미 로그인 페이지로 리다이렉트를 예약해뒀다. 리다이렉트는
+      // 즉시 실행을 멈추지 않으므로, 여기서 alert까지 띄우면 블로킹 alert가 리다이렉트보다
+      // 먼저 뜨면서 헷갈리는 실패 메시지를 보여주게 된다.
+      if (res.status !== 401) {
+        alert(json.message || "프로필 이미지 변경에 실패했습니다.");
+      }
       setPreviewImage(getImageUrl(user.profileImage) ?? "/default-profile.png");
     }
     URL.revokeObjectURL(objectUrl);
