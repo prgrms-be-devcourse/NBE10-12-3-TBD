@@ -166,6 +166,18 @@ class UserServiceTest {
     }
 
     @Test
+    fun updateProfile_카카오_사용자는_이메일_변경_불가() {
+        val user = createUser(1L, "nickname", "image.jpg", null, Provider.KAKAO)
+        given(userRepository.findById(1L)).willReturn(Optional.of(user))
+
+        assertThatThrownBy {
+            userService.updateProfile(1L, 1L, updateEmailRequest("new@example.com"))
+        }
+            .isInstanceOf(AccessDeniedException::class.java)
+            .hasMessageContaining("카카오 계정은 이메일을 변경할 수 없습니다.")
+    }
+
+    @Test
     fun updateProfile_비밀번호를_변경한다() {
         val user = createUser(1L, "nickname", "image.jpg", "encodedOldPassword", Provider.LOCAL)
         given(userRepository.findById(1L)).willReturn(Optional.of(user))

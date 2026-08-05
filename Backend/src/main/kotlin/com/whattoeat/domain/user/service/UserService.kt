@@ -52,14 +52,14 @@ class UserService(
 
         val newEmail = request.email
         if (newEmail != null && newEmail != user.email) {
+            if (user.provider == Provider.KAKAO) {
+                throw AccessDeniedException("카카오 계정은 이메일을 변경할 수 없습니다.")
+            }
             if (userRepository.existsByEmail(newEmail)) {
                 throw DuplicateEmailException("이미 사용 중인 이메일입니다.")
             }
             user.updateEmail(newEmail)
-
-            if (user.provider == Provider.LOCAL) {
-                user.updateLoginId(newEmail)
-            }
+            user.updateLoginId(newEmail)
         }
 
         val newPassword = request.newPassword

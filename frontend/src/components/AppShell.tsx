@@ -89,6 +89,7 @@ const fallbackUser: CurrentUser = {
 
 interface FeedListPageResponse {
   feeds: unknown[];
+  totalElements: number;
 }
 
 /* =========================================================
@@ -155,7 +156,7 @@ export function SidebarProfile() {
           followingCount: number;
         }>(`/api/v1/follows/users/${user.userId}/count`),
         apiFetchJson<FeedListPageResponse>(
-          `/api/v1/feeds?userId=${user.userId}`,
+          `/api/v1/feeds?userId=${user.userId}&size=1`,
         ),
       ]);
 
@@ -166,7 +167,7 @@ export function SidebarProfile() {
       }
 
       if (feedRes.ok && feedRes.data) {
-        setPostCount(feedRes.data.feeds.length);
+        setPostCount(feedRes.data.totalElements);
       }
     };
 

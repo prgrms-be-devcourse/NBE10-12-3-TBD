@@ -63,6 +63,11 @@ export default function EditProfilePage() {
       return;
     }
 
+    // 이전 blob 미리보기 URL을 해제하지 않으면 사진을 여러 번 바꿀 때마다 계속 쌓인다.
+    if (previewImage.startsWith("blob:")) {
+      URL.revokeObjectURL(previewImage);
+    }
+
     const objectUrl = URL.createObjectURL(file);
     setPreviewImage(objectUrl);
     setIsUploadingImage(true);
@@ -86,10 +91,14 @@ export default function EditProfilePage() {
         email: json.data.email,
       });
       window.dispatchEvent(new Event("login-state-change"));
+      // 업로드가 끝나면 서버가 내려준 실제 URL로 교체하고, 더 이상 필요 없는 로컬
+      // blob 미리보기는 바로 해제한다.
+      setPreviewImage(getImageUrl(json.data.profileImage) ?? "/default-profile.png");
     } else {
       alert(json.message || "프로필 이미지 변경에 실패했습니다.");
       setPreviewImage(getImageUrl(user.profileImage) ?? "/default-profile.png");
     }
+    URL.revokeObjectURL(objectUrl);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
