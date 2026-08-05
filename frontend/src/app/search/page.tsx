@@ -2242,11 +2242,16 @@ function SearchPage() {
    * 검색어 지우기
    */
   const handleClearQuery = () => {
+    // createSearchRequestId()로 진행 중인 요청의 콜백을 무효화하면, 그 콜백은
+    // isLatestSearchRequest 체크에서 곧바로 return해 자신의 setLoading(false)를
+    // 실행하지 못한다. 여기서 명시적으로 꺼주지 않으면 loading이 true로 멈춰서
+    // 검색/현재 위치 버튼이 계속 비활성 상태로 남는다.
     createSearchRequestId();
     setQuery("");
     setResults([]);
     setError("");
     setHoveredPlaceId(null);
+    setLoading(false);
     resetPagination();
   };
 
