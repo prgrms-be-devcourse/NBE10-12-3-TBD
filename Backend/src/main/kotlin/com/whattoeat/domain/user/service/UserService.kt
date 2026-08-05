@@ -59,7 +59,14 @@ class UserService(
                 throw DuplicateEmailException("이미 사용 중인 이메일입니다.")
             }
             user.updateEmail(newEmail)
-            user.updateLoginId(newEmail)
+
+            // LOCAL 계정만 loginId를 이메일과 동기화한다. "KAKAO가 아니면 LOCAL"이라는
+            // 암묵적 가정에 기대지 않고 명시적으로 LOCAL을 확인해야, 이후 다른 소셜
+            // provider가 추가돼도 그 계정의 loginId(소셜 로그인 매칭에 쓰일 수 있음)를
+            // 의도치 않게 이메일로 덮어쓰지 않는다.
+            if (user.provider == Provider.LOCAL) {
+                user.updateLoginId(newEmail)
+            }
         }
 
         val newPassword = request.newPassword
