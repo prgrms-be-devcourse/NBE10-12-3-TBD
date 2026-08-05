@@ -2,7 +2,9 @@ package com.whattoeat.domain.follow.service
 
 import com.whattoeat.domain.follow.entity.Follow
 import com.whattoeat.domain.follow.repository.FollowRepository
+import com.whattoeat.domain.notification.entity.NotificationType
 import com.whattoeat.domain.notification.event.FollowedEvent
+import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.AlreadyFollowingException
@@ -21,6 +23,7 @@ class FollowService(
     private val followRepository: FollowRepository,
     private val userRepository: UserRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val notificationRepository: NotificationRepository,
 ) {
     @Transactional
     fun follow(followerId: Long, followingId: Long): Follow {
@@ -47,6 +50,11 @@ class FollowService(
             .orElseThrow { FollowNotFoundException() }
 
         followRepository.delete(follow)
+
+        // 언팔로우 시 해당 팔로우 알림도 지워서, 나중에 다시 팔로우하면 알림이 다시 가도록 한다.
+        notificationRepository.deleteByReceiverIdAndActorIdAndTypeAndFeedIsNullAndRestaurantListIsNull(
+            followingId, followerId, NotificationType.FOLLOW
+        )
     }
 
     @Transactional(readOnly = true)

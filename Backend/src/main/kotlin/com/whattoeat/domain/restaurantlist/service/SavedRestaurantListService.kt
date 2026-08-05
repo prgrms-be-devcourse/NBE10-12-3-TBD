@@ -1,6 +1,8 @@
 package com.whattoeat.domain.restaurantlist.service
 
+import com.whattoeat.domain.notification.entity.NotificationType
 import com.whattoeat.domain.notification.event.RestaurantListSavedEvent
+import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.domain.restaurantlist.dto.SavedRestaurantListResponse
 import com.whattoeat.domain.restaurantlist.entity.SavedRestaurantList
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListRepository
@@ -22,6 +24,7 @@ class SavedRestaurantListService(
     private val restaurantListRepository: RestaurantListRepository,
     private val savedRestaurantListRepository: SavedRestaurantListRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val notificationRepository: NotificationRepository,
 ) {
     // 레스토랑 리스트 저장(연결)
     fun save(userId: Long, restaurantListId: Long) {
@@ -58,6 +61,11 @@ class SavedRestaurantListService(
 
         // 저장 기록만 삭제 (원본 레스토랑 리스트는 그대로 유지)
         savedRestaurantListRepository.delete(savedRestaurantList)
+
+        // 저장 취소 시 해당 알림도 지워서, 나중에 다시 저장하면 알림이 다시 가도록 한다.
+        notificationRepository.deleteByReceiverIdAndActorIdAndRestaurantListIdAndType(
+            savedRestaurantList.restaurantList.user.id!!, userId, restaurantListId, NotificationType.LIST_SHARE
+        )
     }
 
     // 내가 저장한 레스토랑 리스트 목록 조회

@@ -5,7 +5,9 @@ import com.whattoeat.domain.feed.repository.FeedRepository
 import com.whattoeat.domain.feedlike.dto.FeedLikeResponse
 import com.whattoeat.domain.feedlike.entity.FeedLike
 import com.whattoeat.domain.feedlike.repository.FeedLikeRepository
+import com.whattoeat.domain.notification.entity.NotificationType
 import com.whattoeat.domain.notification.event.FeedLikedEvent
+import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.domain.user.entity.User
 import com.whattoeat.domain.user.repository.UserRepository
 import com.whattoeat.global.exception.AlreadyLikedFeedException
@@ -22,6 +24,7 @@ class FeedLikeService(
     private val userRepository: UserRepository,
     private val feedRepository: FeedRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val notificationRepository: NotificationRepository,
 ) {
     @Transactional
     fun like(userId: Long, feedId: Long): FeedLikeResponse {
@@ -53,6 +56,11 @@ class FeedLikeService(
         feedLikeRepository.delete(feedLike)
 
         feed.decreaseLikeCount()
+
+        // 좋아요 취소 시 해당 알림도 지워서, 나중에 다시 좋아요를 누르면 알림이 다시 가도록 한다.
+        notificationRepository.deleteByReceiverIdAndActorIdAndFeedIdAndType(
+            feed.user.id!!, userId, feedId, NotificationType.FEED_LIKE
+        )
 
         return FeedLikeResponse.of(feed.id, feed.likeCount, false)
     }

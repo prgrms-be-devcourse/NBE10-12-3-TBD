@@ -5,6 +5,8 @@ import com.whattoeat.domain.restaurantlist.dto.SavedRestaurantListResponse
 import com.whattoeat.domain.restaurantlist.entity.RestaurantList
 import com.whattoeat.domain.restaurantlist.entity.RestaurantListItem
 import com.whattoeat.domain.restaurantlist.entity.SavedRestaurantList
+import com.whattoeat.domain.notification.entity.NotificationType
+import com.whattoeat.domain.notification.repository.NotificationRepository
 import com.whattoeat.domain.restaurantlist.repository.RestaurantListRepository
 import com.whattoeat.domain.restaurantlist.repository.SavedRestaurantListRepository
 import com.whattoeat.domain.user.entity.User
@@ -43,6 +45,9 @@ class SavedRestaurantListServiceTest {
 
     @Mock
     lateinit var eventPublisher: ApplicationEventPublisher
+
+    @Mock
+    lateinit var notificationRepository: NotificationRepository
 
     @InjectMocks
     lateinit var savedRestaurantListService: SavedRestaurantListService
@@ -171,8 +176,11 @@ class SavedRestaurantListServiceTest {
     fun `unsave 성공`() {
         val userId = 1L
         val restaurantListId = 10L
+        val ownerId = 2L
 
         val savedRestaurantList = mock(SavedRestaurantList::class.java)
+        val restaurantList = mock(RestaurantList::class.java)
+        val owner = mock(User::class.java)
 
         given(
             savedRestaurantListRepository.findByUserIdAndRestaurantListId(
@@ -181,11 +189,21 @@ class SavedRestaurantListServiceTest {
             )
         ).willReturn(Optional.of(savedRestaurantList))
 
+        given(savedRestaurantList.restaurantList).willReturn(restaurantList)
+        given(restaurantList.user).willReturn(owner)
+        given(owner.id).willReturn(ownerId)
+
         savedRestaurantListService.unsave(userId, restaurantListId)
 
         then(savedRestaurantListRepository)
             .should()
             .delete(savedRestaurantList)
+
+        then(notificationRepository)
+            .should()
+            .deleteByReceiverIdAndActorIdAndRestaurantListIdAndType(
+                ownerId, userId, restaurantListId, NotificationType.LIST_SHARE
+            )
     }
 
     @Test

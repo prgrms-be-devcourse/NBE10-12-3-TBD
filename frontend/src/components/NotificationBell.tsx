@@ -26,6 +26,10 @@ interface NotificationCursorResponse {
   hasNext: boolean;
 }
 
+interface UnreadCountResponse {
+  count: number;
+}
+
 function formatCreatedAt(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -41,8 +45,17 @@ export function NotificationBell() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [hasNext, setHasNext] = useState(false);
+  // 배지 개수는 현재 로드된 알림 목록(최초 20개, 스크롤한 만큼만 더 로드됨)에서 계산하면
+  // 안 읽은 알림이 그보다 많을 때 실제보다 적게 표시된다. 서버가 전체 기준으로 정확히
+  // 세어주는 전용 엔드포인트가 있으므로 그걸 그대로 쓴다.
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
+  const loadUnreadCount = useCallback(async () => {
+    const res = await apiFetchJson<UnreadCountResponse>("/api/v1/notifications/unread-count");
+    if (res.ok && res.data) {
+      setUnreadCount(res.data.count);
+    }
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -78,21 +91,22 @@ export function NotificationBell() {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      void loadNotifications();
+      void loadUnreadCount();
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [loadNotifications]);
+  }, [loadUnreadCount]);
 
   useEffect(() => {
     if (open) {
       const frame = requestAnimationFrame(() => {
         void loadNotifications();
+        void loadUnreadCount();
       });
 
       return () => cancelAnimationFrame(frame);
     }
-  }, [loadNotifications, open]);
+  }, [loadNotifications, loadUnreadCount, open]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -120,6 +134,7 @@ export function NotificationBell() {
         setNotifications((prev) =>
           prev.map((item) => (item.id === notification.id ? updatedNotification : item))
         );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
       }
     }
 
@@ -133,9 +148,11 @@ export function NotificationBell() {
         break;
       case "FEED_LIKE":
       case "FEED_COMMENT":
-        // 내 피드에 대한 반응 → 내 피드는 팔로잉 탭에 안 뜨므로 추천 탭으로
+        // 내 피드에 대한 반응. 추천 탭 후보 쿼리(findRecommendCandidates)는 내 글을
+        // 항상 제외하므로, 추천 탭으로 보내면 하이라이트 대상이 없어 아무 반응도 없는
+        // 것처럼 보인다. 팔로잉 탭 쿼리(findFollowingFeeds)는 내 글도 포함하므로 그쪽으로 보낸다.
         if (notification.feedId) {
-          router.push(`/feed?tab=recommended&highlight=${notification.feedId}`);
+          router.push(`/feed?tab=following&highlight=${notification.feedId}`);
         }
         break;
       case "FOLLOW":
