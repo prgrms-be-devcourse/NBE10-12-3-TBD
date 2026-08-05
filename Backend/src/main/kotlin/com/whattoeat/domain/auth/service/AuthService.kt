@@ -127,15 +127,28 @@ class AuthService(
         return AuthResult(accessToken, refreshToken, AuthUserResponse.from(user))
     }
 
-    fun logout(token: String) {
-        val remaining = jwtUtil.getRemainingExpiration(token)
-        if (remaining > 0) {
-            redisTemplate.opsForValue().set("blacklist:${token}", "logout", remaining, TimeUnit.MILLISECONDS)
+    // accessToken(1시간)은 refreshToken(7일)보다 먼저 만료돼 쿠키가 사라질 수 있으므로,
+    // accessToken이 없어도 refreshToken만으로 로그아웃 처리가 가능해야 한다. 안 그러면
+    // 로그인 후 1시간이 지나서 로그아웃할 때 accessToken 블랙리스트 등록만 건너뛰고
+    // refreshToken 무효화까지 통째로 생략돼, 탈취된 refreshToken이 /reissue에 계속
+    // 쓰일 수 있다. 토큰 파싱/Redis 처리 중 실패해도 로그아웃 자체는 막지 않는다.
+    fun logout(accessToken: String?, refreshToken: String?) {
+        if (!accessToken.isNullOrBlank()) {
+            runCatching {
+                val remaining = jwtUtil.getRemainingExpiration(accessToken)
+                if (remaining > 0) {
+                    redisTemplate.opsForValue().set("blacklist:${accessToken}", "logout", remaining, TimeUnit.MILLISECONDS)
+                }
+            }
         }
-        // accessToken만 블랙리스트에 올리고 refreshToken을 그대로 두면, 로그아웃 후에도
-        // 탈취된(혹은 남아있는) refreshToken으로 /reissue를 호출해 새 accessToken을 계속
-        // 발급받을 수 있다. 로그아웃 시 refreshToken 자체를 무효화해야 한다.
-        val userId = jwtUtil.getUserId(token)
-        redisTemplate.delete("refresh:${userId}")
+
+        val userId = accessToken?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { jwtUtil.getUserId(it) }.getOrNull() }
+            ?: refreshToken?.takeIf { it.isNotBlank() }
+                ?.let { runCatching { jwtUtil.getUserId(it) }.getOrNull() }
+
+        if (userId != null) {
+            redisTemplate.delete("refresh:${userId}")
+        }
     }
 }

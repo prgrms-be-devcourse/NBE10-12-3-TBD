@@ -266,24 +266,30 @@ internal class AuthControllerTest {
     @DisplayName("accessToken쿠키와 함께 로그아웃 요청 시 200 반환")
     fun logoutSuccess() {
         given(rq.getCookieValue("accessToken")).willReturn("valid-token")
+        given(rq.getCookieValue("refreshToken")).willReturn("valid-refresh-token")
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/auth/logout"))
             .andExpect(MockMvcResultMatchers.status().isOk())
             .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
             .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("로그아웃 되었습니다."))
 
-        then(authService).should().logout("valid-token")
+        then(authService).should().logout("valid-token", "valid-refresh-token")
         then(rq).should().delCookie("accessToken")
         then(rq).should().delCookie("refreshToken")
     }
 
     @Test
-    @DisplayName("accessToken쿠키 없이 로그아웃 요청 시 서비스 호출 없이 200 반환")
-    fun logoutWithoutToken() {
+    @DisplayName("accessToken쿠키가 만료돼 없어도 refreshToken으로 서비스가 호출되고 쿠키는 지워진다")
+    fun logoutWithoutAccessTokenStillInvalidatesRefreshToken() {
         given(rq.getCookieValue("accessToken")).willReturn(null)
+        given(rq.getCookieValue("refreshToken")).willReturn("valid-refresh-token")
 
         mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/auth/logout"))
             .andExpect(MockMvcResultMatchers.status().isOk())
             .andExpect(MockMvcResultMatchers.jsonPath("$.success").value(true))
+
+        then(authService).should().logout(null, "valid-refresh-token")
+        then(rq).should().delCookie("accessToken")
+        then(rq).should().delCookie("refreshToken")
     }
 }

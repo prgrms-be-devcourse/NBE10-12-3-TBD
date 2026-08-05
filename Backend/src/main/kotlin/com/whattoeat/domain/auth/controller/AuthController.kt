@@ -83,12 +83,15 @@ class AuthController(private val authService: AuthService, private val rq: Rq) {
     @PostMapping("/logout")
     fun logout(): RsData<Void?> {
         val accessToken = rq.getCookieValue("accessToken")
-        if (!accessToken.isNullOrBlank()) {
-            authService.logout(accessToken)
-        }
+        val refreshToken = rq.getCookieValue("refreshToken")
 
-        rq.delCookie("accessToken")
-        rq.delCookie("refreshToken")
+        try {
+            authService.logout(accessToken, refreshToken)
+        } finally {
+            // 토큰 파싱/Redis 처리가 실패하더라도 브라우저 쿠키는 반드시 지운다.
+            rq.delCookie("accessToken")
+            rq.delCookie("refreshToken")
+        }
 
         return RsData.success(null, "로그아웃 되었습니다.")
     }

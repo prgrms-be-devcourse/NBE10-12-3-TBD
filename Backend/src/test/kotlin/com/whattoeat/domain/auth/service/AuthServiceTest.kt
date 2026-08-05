@@ -286,7 +286,7 @@ internal class AuthServiceTest {
         given(jwtUtil.getRemainingExpiration(token)).willReturn(remaining)
         given(redisTemplate.opsForValue()).willReturn(valueOperations)
 
-        authService.logout(token)
+        authService.logout(token, null)
 
         Mockito.verify(valueOperations, Mockito.times(1))
             .set("blacklist:" + token, "logout", remaining, TimeUnit.MILLISECONDS)
@@ -303,9 +303,24 @@ internal class AuthServiceTest {
         given(jwtUtil.getUserId(token)).willReturn(userId)
         given(redisTemplate.opsForValue()).willReturn(valueOperations)
 
-        authService.logout(token)
+        authService.logout(token, null)
 
         Mockito.verify(redisTemplate, Mockito.times(1)).delete("refresh:$userId")
+    }
+
+    @Test
+    @DisplayName("accessToken 쿠키가 만료되어 없어도 refreshToken으로 Redis 값을 무효화")
+    fun logoutWithoutAccessTokenUsesRefreshToken() {
+        val refreshToken = "valid.refresh.token"
+        val userId = 1L
+
+        given(jwtUtil.getUserId(refreshToken)).willReturn(userId)
+
+        authService.logout(null, refreshToken)
+
+        Mockito.verify(redisTemplate, Mockito.times(1)).delete("refresh:$userId")
+        // accessToken이 없으므로 블랙리스트 등록 시도 자체가 없어야 한다.
+        Mockito.verify(jwtUtil, Mockito.never()).getRemainingExpiration(org.mockito.ArgumentMatchers.anyString())
     }
 
     @Test
@@ -315,7 +330,7 @@ internal class AuthServiceTest {
 
         given(jwtUtil.getRemainingExpiration(token)).willReturn(-1L)
 
-        authService.logout(token)
+        authService.logout(token, null)
 
         Mockito.verify(redisTemplate, Mockito.never()).opsForValue()
     }
