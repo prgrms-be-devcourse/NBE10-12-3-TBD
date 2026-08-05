@@ -2,12 +2,6 @@
 
 import { ReactNode, useRef, useState } from "react";
 
-/**
- * 결과 머리글 + 식당 1개가 온전히 보이는 최소 높이(px).
- * 스펙: 시트는 이 높이 이하로 낮아질 수 없다.
- */
-const MIN_HEIGHT = 200;
-
 interface BottomSheetProps {
   /** 스냅 높이(화면 높이 대비 비율, 오름차순). 예: [0.2, 0.5, 0.85] */
   snaps: number[];
@@ -37,7 +31,7 @@ export default function BottomSheet({
     draggingRef.current = true;
     startYRef.current = e.clientY;
     startHeightRef.current =
-      containerRef.current?.getBoundingClientRect().height ?? MIN_HEIGHT;
+      containerRef.current?.getBoundingClientRect().height ?? 0;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
@@ -46,7 +40,7 @@ export default function BottomSheet({
 
     const delta = startYRef.current - e.clientY; // 위로 올리면 양수
     const maxHeight = maxRatio * window.innerHeight;
-    const next = Math.min(maxHeight, Math.max(MIN_HEIGHT, startHeightRef.current + delta));
+    const next = Math.min(maxHeight, Math.max(0, startHeightRef.current + delta));
     setDragHeight(next);
   };
 
@@ -59,7 +53,7 @@ export default function BottomSheet({
       let nearest = 0;
       let bestDistance = Infinity;
       snaps.forEach((ratio, index) => {
-        const height = Math.max(MIN_HEIGHT, ratio * window.innerHeight);
+        const height = ratio * window.innerHeight;
         const distance = Math.abs(height - dragHeight);
         if (distance < bestDistance) {
           bestDistance = distance;
@@ -78,7 +72,7 @@ export default function BottomSheet({
         height:
           dragHeight !== null
             ? `${dragHeight}px`
-            : `max(${MIN_HEIGHT}px, calc(${snaps[snap]} * 100dvh))`,
+            : `${snaps[snap] * 100}dvh`,
       }}
       className={`fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 flex flex-col overflow-hidden rounded-t-2xl border-t border-hairline-soft bg-surface shadow-[0_-4px_20px_rgba(0,0,0,0.08)] lg:hidden ${
         dragHeight !== null ? "" : "transition-[height] duration-300 ease-out"
@@ -97,7 +91,11 @@ export default function BottomSheet({
       </div>
 
       {/* 콘텐츠 (스크롤은 children이 관리) */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
+          snap === 0 && dragHeight === null ? "hidden" : ""
+        }`}
+      >
         {children}
       </div>
     </div>

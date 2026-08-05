@@ -764,15 +764,15 @@ export default function RecommendPage() {
       {/* Result modal */}
       {resultModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl bg-surface p-5 shadow-2xl animate-in fade-in-50 zoom-in-95 sm:p-8">
-            <div className="mb-6 flex items-center justify-between border-b border-hairline-soft pb-3">
+          <div className="recommend-result-modal w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl bg-surface p-5 shadow-2xl animate-in fade-in-50 zoom-in-95 sm:p-8">
+            <div className="recommend-result-header relative mb-6 flex items-center justify-center border-b border-hairline-soft pb-3">
               <div className="text-center">
                 <p className="text-sm font-bold text-primary mb-1">오늘의 추천</p>
                 <h3 className="text-xl font-bold text-ink">이런 곳은 어때요?</h3>
               </div>
               <button
                 onClick={() => setResultModalOpen(false)}
-                className="text-muted hover:text-ink"
+                className="absolute right-0 top-0 text-muted hover:text-ink"
                 aria-label="닫기"
               >
                 <X className="h-5 w-5" />
@@ -818,60 +818,62 @@ export default function RecommendPage() {
                   </p>
                 )}
 
-                {/* Map */}
-                <div className="relative mb-4 h-48 w-full overflow-hidden rounded-2xl border border-hairline-soft sm:h-56">
-                  <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
-                  <button
-                    onClick={() => {
-                      const maps = window.kakao?.maps;
-                      if (!map || !navigator.geolocation || !maps) return;
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                          const center = new maps.LatLng(
-                            pos.coords.latitude,
-                            pos.coords.longitude
-                          );
-                          map.setCenter(center);
-                        },
-                        () => alert("현재 위치를 가져올 수 없습니다.")
-                      );
-                    }}
-                    className="absolute bottom-2 right-2 flex items-center justify-center rounded-lg border border-hairline bg-surface/90 p-1.5 text-muted shadow-sm hover:bg-white"
-                    aria-label="현재 위치"
-                  >
-                    <Navigation className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Draft card */}
-                <div className="rounded-2xl bg-surface border border-hairline-soft overflow-hidden shadow-sm">
-                  <div className="flex h-16 w-full items-center justify-center bg-primary-soft text-4xl sm:h-20">
-                    {categoryEmoji[currentLabel] || "🍽\uFE0F"}
+                <div className="recommend-result-main">
+                  {/* Map */}
+                  <div className="recommend-result-map relative mb-4 h-48 w-full overflow-hidden rounded-2xl border border-hairline-soft sm:h-56">
+                    <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
+                    <button
+                      onClick={() => {
+                        const maps = window.kakao?.maps;
+                        if (!map || !navigator.geolocation || !maps) return;
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            const center = new maps.LatLng(
+                              pos.coords.latitude,
+                              pos.coords.longitude
+                            );
+                            map.setCenter(center);
+                          },
+                          () => alert("현재 위치를 가져올 수 없습니다.")
+                        );
+                      }}
+                      className="absolute bottom-2 right-2 flex items-center justify-center rounded-lg border border-hairline bg-surface/90 p-1.5 text-muted shadow-sm hover:bg-white"
+                      aria-label="현재 위치"
+                    >
+                      <Navigation className="h-4 w-4" />
+                    </button>
                   </div>
-                  <div className="p-4 sm:p-6">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary-active">
-                        {currentLabel}
-                      </span>
-                      <span className="rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
-                        {selectedMood}
-                      </span>
-                    </div>
-                    <h4 className="text-2xl font-bold text-ink">{current.name}</h4>
-                    <p className="mt-1 text-sm text-muted">
-                      {current.region1} {current.region2} {current.region3} {current.region4}
-                    </p>
 
-                    <div className="mt-4 space-y-1.5 text-sm text-body">
-                      <p>{current.roadAddress}</p>
-                      <p className="text-muted-soft">{current.address}</p>
-                      <p>전화: {current.phone}</p>
+                  {/* Draft card */}
+                  <div className="recommend-result-card rounded-2xl bg-surface border border-hairline-soft overflow-hidden shadow-sm">
+                    <div className="recommend-result-category-banner flex h-12 w-full items-center justify-center bg-primary-soft text-3xl sm:h-14">
+                      {categoryEmoji[currentLabel] || "🍽\uFE0F"}
+                    </div>
+                    <div className="recommend-result-card-content p-4 sm:p-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-bold text-primary-active">
+                          {currentLabel}
+                        </span>
+                        <span className="rounded-full bg-tag-mood px-2.5 py-1 text-xs font-bold text-ink">
+                          {selectedMood}
+                        </span>
+                      </div>
+                      <h4 className="text-2xl font-bold text-ink">{current.name}</h4>
+                      <p className="mt-1 text-sm text-muted">
+                        {current.region1} {current.region2} {current.region3} {current.region4}
+                      </p>
+
+                      <div className="mt-4 space-y-1.5 text-sm text-body">
+                        <p>{current.roadAddress}</p>
+                        <p className="text-muted-soft">{current.address}</p>
+                        <p>전화: {current.phone}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Action buttons */}
-                <div className="mt-6 grid grid-cols-3 gap-3">
+                <div className="recommend-result-actions mt-6 grid grid-cols-[1.25fr_1fr_1fr] gap-3">
                   <button
                     onClick={handleDecide}
                     className="flex items-center justify-center gap-1.5 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary-active transition-colors"
@@ -882,14 +884,14 @@ export default function RecommendPage() {
                   <button
                     onClick={handleNext}
                     disabled={recommendLoading}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-surface py-3 text-sm font-bold text-ink hover:bg-surface-soft transition-colors disabled:opacity-70"
+                    className="recommend-secondary-action flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-hairline bg-surface py-3 text-sm font-bold text-muted hover:bg-surface-soft transition-colors disabled:opacity-70"
                   >
                     <RotateCcw className="h-4 w-4" />
                     다른곳 추천
                   </button>
                   <button
                     onClick={handleSave}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-hairline bg-surface py-3 text-sm font-bold text-ink hover:bg-surface-soft transition-colors"
+                    className="recommend-secondary-action flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-hairline bg-surface py-3 text-sm font-bold text-muted hover:bg-surface-soft transition-colors"
                   >
                     <Bookmark className="h-4 w-4" />
                     리스트 저장
@@ -898,7 +900,7 @@ export default function RecommendPage() {
 
                 <button
                   onClick={() => setResultModalOpen(false)}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-hairline bg-surface-soft py-3 text-sm font-bold text-muted hover:bg-surface transition-colors"
+                  className="recommend-result-close mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-hairline bg-surface-soft py-3 text-sm font-bold text-muted hover:bg-surface transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   추천 페이지로 돌아가기

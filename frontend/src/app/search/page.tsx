@@ -294,8 +294,8 @@ function SearchForm({
   return (
     <form onSubmit={onSubmit}>
       {/* 검색 입력 */}
-      <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface-soft px-3 py-1.5">
-        <Search className="h-5 w-5 shrink-0 text-muted" />
+      <div className="flex items-center gap-1.5 rounded-xl border border-hairline bg-surface-soft px-2 py-1 lg:gap-2 lg:px-3 lg:py-1.5">
+        <Search className="h-4 w-4 shrink-0 text-muted lg:h-5 lg:w-5" />
 
         {mounted && (
           <input
@@ -311,9 +311,9 @@ function SearchForm({
             type="button"
             onClick={onClear}
             aria-label="검색어 지우기"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-ink"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-ink lg:h-7 lg:w-7"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
           </button>
         )}
 
@@ -322,28 +322,28 @@ function SearchForm({
           onClick={onCurrentLocation}
           disabled={loading}
           aria-label="현재 위치"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-hairline bg-white text-primary transition-colors hover:bg-surface-strong disabled:opacity-60"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-hairline bg-white text-primary transition-colors hover:bg-surface-strong disabled:opacity-60 lg:h-7 lg:w-7"
         >
-          <Navigation className="h-4 w-4" />
+          <Navigation className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
         </button>
 
         <button
           type="submit"
           disabled={loading}
-          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-primary-active disabled:opacity-70"
+          className="shrink-0 rounded-lg bg-primary px-2 py-1 text-[11px] font-bold text-white transition-colors hover:bg-primary-active disabled:opacity-70 lg:px-3 lg:py-1.5 lg:text-xs"
         >
           {loading ? "검색 중" : "검색"}
         </button>
       </div>
 
       {/* 카테고리 */}
-      <div className="mt-2 flex gap-1.5 overflow-x-auto">
+      <div className="mt-1 flex gap-1 overflow-x-auto lg:mt-2 lg:gap-1.5">
         {categories.map((category) => (
           <button
             key={category}
             type="button"
             onClick={() => onCategoryChange(category)}
-            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors lg:px-2.5 lg:py-1 lg:text-xs ${
               category === activeCategory
                 ? "bg-primary text-white"
                 : "bg-surface-soft text-muted hover:bg-hairline-soft"
@@ -598,7 +598,7 @@ function SearchPage() {
    */
   const [showResearchButton, setShowResearchButton] = useState(false);
 
-  /** 모바일 결과 시트 스냅: 0=슬쩍, 1=반쯤, 2=전체 */
+  /** 모바일 결과 시트 스냅: 0=핸들만, 1=반쯤, 2=전체 */
   const [sheetSnap, setSheetSnap] = useState(0);
 
   /**
@@ -2453,7 +2453,7 @@ function SearchPage() {
         </div>
       }
     >
-      <div className="search-map-viewport relative overflow-hidden rounded-2xl border border-hairline-soft lg:h-[calc(100vh-6.5rem)] lg:min-h-0">
+      <div className="search-map-viewport relative h-[calc(100dvh-10.5rem)] min-h-0 overflow-hidden rounded-2xl border border-hairline-soft lg:h-[calc(100vh-6.5rem)]">
         {/* 지도 */}
         <div ref={mapRef} className="absolute inset-0 bg-surface-strong" />
 
@@ -2471,7 +2471,7 @@ function SearchPage() {
 
         {/* 모바일: 지도 위에 뜨는 검색창 + 카테고리 (lg 미만) */}
         <div className="absolute inset-x-3 top-2 z-20 lg:hidden">
-          <div className="rounded-2xl border border-hairline-soft bg-surface/95 p-2 shadow-lg backdrop-blur">
+          <div className="rounded-2xl border border-hairline-soft bg-surface/95 p-1.5 shadow-lg backdrop-blur lg:p-2">
             <SearchForm
               mounted={mounted}
               query={query}
@@ -2520,7 +2520,7 @@ function SearchPage() {
         {/* 모바일: 드래그 결과 시트 (lg 미만) */}
         <div className="lg:hidden">
           <BottomSheet
-            snaps={[0.2, 0.5, 0.85]}
+            snaps={[0.08, 0.5, 0.85]}
             snap={sheetSnap}
             onSnapChange={setSheetSnap}
           >
