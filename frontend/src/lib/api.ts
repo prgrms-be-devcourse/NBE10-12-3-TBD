@@ -98,12 +98,19 @@ async function apiFetchInternal(
     }
 
     // 여기 도달했다는 건 reissue가 실패했거나(refreshToken도 무효) reissue 성공 후
-    // 재시도한 요청조차 또 401이 났다는 뜻 — 어느 쪽이든 실제로 로그아웃된 상태이므로,
-    // apiFetchJson뿐 아니라 apiFetch를 직접 쓰는 호출부(FormData 업로드 등)도 여기서
-    // 동일하게 세션 정리 + 로그인 리다이렉트를 받는다.
+    // 재시도한 요청조차 또 401이 났다는 뜻 — 어느 쪽이든 실제로 로그아웃된 상태다.
     if (shouldRedirectToLogin(res.status)) {
       clearClientSession();
       window.location.assign("/login");
+
+      // window.location.assign은 페이지 이동을 "예약"할 뿐 스크립트 실행을 즉시 멈추지
+      // 않는다. 여기서 res를 그대로 반환하면 호출부의 await 다음 줄(alert, 에러 UI 등)이
+      // 리다이렉트보다 먼저 실행돼 헷갈리는 실패 메시지를 한 번 보여주게 된다. 호출부마다
+      // "이게 401이었는지" 개별적으로 가드하는 방식은 계속 빠뜨리기 쉬우므로, 아예 이
+      // Promise를 resolve하지 않는다 — 곧 페이지 전체가 unload될 것이므로 pending 상태로
+      // 영원히 남아도 문제없고, apiFetch/apiFetchJson을 쓰는 모든 호출부가 별도 조치 없이
+      // 일관되게 "그 이후 코드가 실행되지 않음"을 보장받는다.
+      return new Promise<Response>(() => {});
     }
   }
 

@@ -423,10 +423,7 @@ function WritePostContent() {
       }
 
       router.push(returnUrl);
-    } else if (feedRes.status !== 401) {
-      // 401이면 apiFetch가 이미 로그인 페이지로 리다이렉트를 예약해뒀다. 리다이렉트는
-      // 즉시 실행을 멈추지 않으므로, 여기서 alert까지 띄우면 블로킹 alert가 리다이렉트보다
-      // 먼저 뜨면서 "작성 실패"라는 헷갈리는 메시지를 보여주게 된다.
+    } else {
       alert(
         feedJson.message ||
           (isEditMode
