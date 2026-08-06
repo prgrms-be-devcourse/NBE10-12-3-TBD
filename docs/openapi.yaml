@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: NBE10-12-2-Team1 API
+  title: NBE10-12-3-TBD API
   description: |
     오늘 뭐먹지 SNS 서비스 REST API 문서입니다.
 

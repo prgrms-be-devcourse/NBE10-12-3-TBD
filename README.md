@@ -1,6 +1,6 @@
 # WhatToEat (뭐먹지?)
 
-백엔드 10기 12회차 2차 프로젝트 1팀
+백엔드 10기 12회차 3차 프로젝트 1팀
 
 맛집을 기록하고 공유하는 소셜 음식 플랫폼입니다. 카카오 지도 API 기반 맛집 검색, 피드 작성, 팔로우, 좋아요, 댓글, 식당 리스트 큐레이션 기능을 제공합니다.
 
@@ -10,7 +10,7 @@
 
 | 분류 | 기술 |
 |---|---|
-| Language | Java 25 |
+| Language | Kotlin 2.2.20 (JDK 24) |
 | Framework | Spring Boot 4.1.0 |
 | Database | MySQL 8 |
 | Cache / Messaging | Redis (Lettuce) |
@@ -43,15 +43,16 @@
 Spring Boot (EC2 :8081)
     ├── SecurityConfig (JWT Filter, OAuth2)
     ├── domain/
-    │   ├── auth        - 로그인, 회원가입, 토큰 재발급
-    │   ├── user        - 프로필 조회·수정
-    │   ├── restaurant  - 식당 검색·저장·추천
-    │   ├── feed        - 피드 CRUD
-    │   ├── comment     - 댓글 CRUD
-    │   ├── feedlike    - 좋아요
-    │   ├── follow      - 팔로우
-    │   ├── notification- 알림
-    │   └── restaurantlist - 맛집 리스트
+    │   ├── auth           - 로그인, 회원가입, 토큰 재발급
+    │   ├── user           - 프로필 조회·수정
+    │   ├── restaurant     - 식당 검색·저장
+    │   ├── recommendation - 분위기 기반 식당 추천
+    │   ├── feed           - 피드 CRUD + 팔로잉/추천 피드
+    │   ├── comment        - 댓글 CRUD
+    │   ├── feedlike       - 좋아요
+    │   ├── follow         - 팔로우
+    │   ├── notification   - 알림
+    │   └── restaurantlist - 맛집 리스트 (내 리스트 + 저장한 리스트)
     │
     ├── MySQL (localhost:3306)
     └── Redis (localhost:6380)
@@ -74,7 +75,7 @@ Spring Boot (EC2 :8081)
 
 ## API 명세
 
-Swagger UI: `http://{host}:8081/swagger-ui/index.html`
+Swagger UI: `http://{EC2_HOST}:8081/swagger-ui/index.html` (배포 서버 주소는 팀 채널 참고)
 
 ### 인증 `/api/v1/auth`
 
@@ -99,10 +100,11 @@ Swagger UI: `http://{host}:8081/swagger-ui/index.html`
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/recommend` | 식당 추천 (카테고리·지역 필터) |
 | GET | `/` | 식당 목록 조회 |
 | POST | `/` | 식당 저장 (카카오 API) |
 | GET | `/{id}` | 식당 상세 조회 |
+| GET | `/today-hot` | 오늘의 인기 식당 |
+| POST | `/recommend` | 분위기 기반 식당 추천 |
 
 ### 피드 `/api/v1/feeds`
 
@@ -139,6 +141,8 @@ Swagger UI: `http://{host}:8081/swagger-ui/index.html`
 | DELETE | `/{followingId}` | 언팔로우 |
 | GET | `/followings` | 내 팔로잉 목록 |
 | GET | `/followers` | 내 팔로워 목록 |
+| GET | `/users/{userId}/followings` | 특정 유저의 팔로잉 목록 |
+| GET | `/users/{userId}/followers` | 특정 유저의 팔로워 목록 |
 | GET | `/users/{userId}/count` | 팔로워·팔로잉 수 |
 
 ### 식당 리스트 `/api/v1/lists`
@@ -149,17 +153,32 @@ Swagger UI: `http://{host}:8081/swagger-ui/index.html`
 | GET | `/` | 내 리스트 목록 |
 | GET | `/{id}` | 리스트 상세 |
 | PUT | `/{id}` | 리스트 수정 |
+| DELETE | `/{id}` | 리스트 삭제 |
 | POST | `/{id}/items` | 식당 추가 |
 | PUT | `/{id}/items/{itemId}` | 항목 수정 |
 | DELETE | `/{id}/items/{itemId}` | 항목 삭제 |
+| GET | `/popular` | 인기 리스트 |
 | GET | `/all` | 전체 공개 리스트 |
+| GET | `/all/{id}` | 공개 리스트 상세 |
+| GET | `/others` | 다른 유저 리스트 |
+| GET | `/users/{userId}` | 특정 유저의 공개 리스트 |
 | POST | `/{id}/copy` | 리스트 복사 |
+
+### 저장한 식당 리스트 `/api/v1/restaurant_lists`
+
+| Method | Path | 설명 |
+|---|---|---|
+| POST | `/{id}/save` | 리스트 저장 (북마크) |
+| DELETE | `/{id}/save` | 저장 취소 |
+| GET | `/saved` | 내가 저장한 리스트 목록 |
+| GET | `/{id}/saved` | 리스트 저장 여부 조회 |
 
 ### 알림 `/api/v1/notifications`
 
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/` | 알림 목록 조회 (페이징) |
+| GET | `/unread-count` | 읽지 않은 알림 개수 |
 | PUT | `/{id}/read` | 알림 읽음 처리 |
 
 ---
@@ -173,10 +192,18 @@ Swagger UI: `http://{host}:8081/swagger-ui/index.html`
 - Redis (포트 6380)
 - Kakao Developers 앱 (OAuth2, Place API)
 
-### 1. 환경 설정 파일 생성
+### 1. MySQL / Redis 기동
 
 ```bash
-cp Backend/src/main/resources/application.yaml.example Backend/src/main/resources/application.yaml
+docker compose up -d
+```
+
+`docker-compose.yaml`이 MySQL(3306), Redis(6380) 컨테이너를 띄웁니다.
+
+### 2. 환경 설정 파일 생성
+
+```bash
+cp Backend/src/main/resources/application.yaml.example Backend/application.yaml
 ```
 
 `application.yaml` 필수 값 설정:
@@ -203,12 +230,14 @@ spring:
       port: 6380
 ```
 
-### 2. 빌드 및 실행
+### 3. 빌드 및 실행
 
 ```bash
 cd Backend
 ./gradlew bootRun
 ```
+
+기본 포트는 8080이며, Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인할 수 있습니다.
 
 ---
 
